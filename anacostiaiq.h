@@ -43,10 +43,6 @@ public:
     // longer used in the depth math.
     double barrelDepth = 137.16;                        // cm
 
-    // Display full-scale for the depth progress bar, taken from the
-    // depth sensor's totalLength (in that sensor's unit).
-    double depthFullScale = 48.0;
-
     int pollInterval  = 3600;                           // Sensor polling interval (seconds)
     bool sensorEnabled      = true;
 
@@ -80,10 +76,6 @@ private:
     // hardware read in the same tick.
     QMap<QString, double> lastReadings;
 
-    // ── Depth measurement ──────────────────────────────────
-    int sensorFailCount = 0;           // Consecutive failed readings
-    static const int MAX_SENSOR_FAILS = 3;  // Show error after this many
-
     // ── Timers ─────────────────────────────────────────────
     QTimer *monitoringTimer;
 
@@ -102,7 +94,7 @@ private:
     // ── UI setup ───────────────────────────────────────────
     void setupDashboard();
     void updateInfoPanels();
-    void reportSensorAvailability(bool depthOk, bool moistureOk);
+    void reportSensorAvailability();
 
     // ── Charts ─────────────────────────────────────────────
     ChartContainer *weatherChart    = new ChartContainer();
@@ -111,16 +103,20 @@ private:
     ChartContainer *moistureChart   = new ChartContainer();
 
     // ── Info panel labels ──────────────────────────────────
-    QLabel *depthValueLabel;
-    QLabel *depthUnitLabel;
-    QLabel *sensorStatusLabel;
-    QProgressBar *depthBar;
+    // ── Info panel: one card per sensor, built from config ─
+    // Each registered sensor gets a card. Widgets are looked up by
+    // sensor id when updating, so adding a sensor in config.json
+    // automatically adds its panel — no code change here.
+    struct SensorCard {
+        QLabel       *value  = nullptr;  // big numeric value
+        QLabel       *unit   = nullptr;  // unit suffix
+        QProgressBar *bar    = nullptr;  // optional; null if no fullScale
+        QLabel       *status = nullptr;  // warning line (hidden unless error)
+    };
+    QMap<QString, SensorCard> sensorCards;   // keyed by sensor id
+    QGroupBox *buildSensorCard(Sensor *s, QWidget *parent);
 
-    QLabel *moistureValueLabel;
-    QLabel *moistureUnitLabel;
-    QLabel *moistureStatusLabel;
-    QProgressBar *moistureBar;
-
+    // ── Fixed (non-sensor) cards ───────────────────────────
     QLabel *rainValueLabel;
     QLabel *rainUnitLabel;
     QProgressBar *rainBar;

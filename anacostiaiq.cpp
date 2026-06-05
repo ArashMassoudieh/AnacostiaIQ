@@ -26,11 +26,14 @@ AnacostiaIQ::AnacostiaIQ(QWidget *parent)
     connect(monitoringTimer, &QTimer::timeout,
             this, &AnacostiaIQ::onMonitoringTick);
 
+    // Build the sensor registry from config BEFORE the dashboard,
+    // so the info panel can create one card per registered sensor.
+    registerSensors();
+
     setupDashboard();
 
-    // Build the sensor registry from config, then bring each one up.
-    // The app keeps running even if a sensor or GPIO is missing.
-    registerSensors();
+    // Bring each sensor up. The app keeps running even if a sensor
+    // or GPIO is missing.
     for (Sensor *s : sensors) {
         bool ok = s->initialize();
         if (!ok)
@@ -38,9 +41,8 @@ AnacostiaIQ::AnacostiaIQ(QWidget *parent)
                        << "unavailable — no GPIO or sensor missing";
     }
 
-    // Per-sensor dashboard messaging for the two that have cards
-    reportSensorAvailability(depthSensor    && depthSensor->isAvailable(),
-                             moistureSensor && moistureSensor->isAvailable());
+    // Per-sensor dashboard messaging (marks any unavailable sensor)
+    reportSensorAvailability();
 
     monitoringTimer->start(pollInterval * 1000);
     QTimer::singleShot(0, this, &AnacostiaIQ::onMonitoringTick);
@@ -88,14 +90,9 @@ void AnacostiaIQ::registerSensors()
     // sensor, edit config.json — no code change needed here.
     sensors = config.createSensors(this);
 
-    // Resolve convenience handles used by the dashboard cards.
+    // Resolve convenience handles used for the depth/moisture charts.
     depthSensor    = findSensor("hcsr04_depth");
     moistureSensor = findSensor("moisture_sensor");
-
-    // Use the depth sensor's full-scale (its totalLength) for the
-    // dashboard progress bar, in the sensor's own unit.
-    if (depthSensor && depthSensor->fullScale() > 0.0)
-        depthFullScale = depthSensor->fullScale();
 }
 
 Sensor *AnacostiaIQ::findSensor(const QString &id) const
@@ -127,35 +124,140 @@ void AnacostiaIQ::logSensorReadings()
 //  Sensor availability reporting (startup)
 // ================================================================
 
-void AnacostiaIQ::reportSensorAvailability(bool depthOk, bool moistureOk)
+void AnacostiaIQ::reportSensorAvailability()
 {
-    // A failed initialize() means either there's no GPIO on this
-    // machine, or the hardware layer (libgpiod/SPI) didn't come up.
-    // The app keeps running; we just surface a message and the
-    // monitoring tick will skip DB writes for the missing sensor.
+    // A failed initialize() means either there's no GPIO/serial on
+    // this machine, or the hardware layer didn't come up. The app
+    // keeps running; we surface a message on each affected card and
+    // the monitoring tick skips DB writes for missing sensors.
+    for (Sensor *s : sensors) {
+        if (s->isAvailable())
+            continue;
+        if (!sensorCards.contains(s->id()))
+            continue;
 
-    if (!depthOk) {
-        qWarning() << "Depth sensor unavailable — no GPIO or sensor missing";
-        sensorStatusLabel->setText("⚠ Depth sensor unavailable (no GPIO)");
-        sensorStatusLabel->show();
-        depthValueLabel->setText("--");
-        depthValueLabel->setStyleSheet("color: #78909c; background: transparent;");
-        depthBar->setValue(0);
-    }
-
-    if (!moistureOk) {
-        qWarning() << "Moisture sensor unavailable — no GPIO or sensor missing";
-        moistureStatusLabel->setText("⚠ Moisture sensor unavailable (no GPIO)");
-        moistureStatusLabel->show();
-        moistureValueLabel->setText("--");
-        moistureValueLabel->setStyleSheet("color: #78909c; background: transparent;");
-        moistureBar->setValue(0);
+        qWarning() << s->displayName()
+                   << "unavailable — no GPIO or sensor missing";
+        SensorCard &c = sensorCards[s->id()];
+        c.status->setText("⚠ " + s->displayName() + " unavailable");
+        c.status->show();
+        c.value->setText("--");
+        c.value->setStyleSheet("color: #78909c; background: transparent;");
+        if (c.bar)
+            c.bar->setValue(0);
     }
 }
 
 // ================================================================
 //  UI Setup
 // ================================================================
+
+// Shared card/widget style helpers (file scope so both
+// setupDashboard and buildSensorCard can use them).
+namespace {
+
+QGroupBox *uiMakeCard(const QString &title, QWidget *parent) {
+    QGroupBox *box = new QGroupBox(title, parent);
+    box->setStyleSheet(R"(
+        QGroupBox {
+            font-size: 11px;
+            font-weight: bold;
+            color: #78909c;
+            background-color: #21252b;
+            border: 1px solid #2d3139;
+            border-radius: 8px;
+            margin-top: 10px;
+            padding-top: 10px;
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-bottom: 6px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 6px;
+        }
+        QLabel {
+            color: #cfd8dc;
+            background: transparent;
+            border: none;
+        }
+    )");
+    return box;
+}
+
+QLabel *uiMakeBigLabel(const QString &text) {
+    QLabel *lbl = new QLabel(text);
+    QFont f;
+    f.setPixelSize(28);
+    f.setBold(true);
+    lbl->setFont(f);
+    lbl->setStyleSheet("color: #eceff1; background: transparent;");
+    return lbl;
+}
+
+QLabel *uiMakeSmallLabel(const QString &text) {
+    QLabel *lbl = new QLabel(text);
+    lbl->setStyleSheet("color: #607d8b; font-size: 11px; background: transparent;");
+    return lbl;
+}
+
+QProgressBar *uiMakeBar(const QString &color) {
+    QProgressBar *bar = new QProgressBar();
+    bar->setRange(0, 100);
+    bar->setValue(0);
+    bar->setTextVisible(false);
+    bar->setFixedHeight(6);
+    bar->setStyleSheet(QString(R"(
+        QProgressBar {
+            background-color: #2d3139;
+            border: none;
+            border-radius: 3px;
+        }
+        QProgressBar::chunk {
+            background-color: %1;
+            border-radius: 3px;
+        }
+    )").arg(color));
+    return bar;
+}
+
+} // namespace
+
+// Build one info-panel card for a sensor. A progress bar is added
+// only when the sensor reports a positive fullScale (e.g. depth
+// sensors with a totalLength); sensors without a meaningful range
+// get value + unit + status only.
+QGroupBox *AnacostiaIQ::buildSensorCard(Sensor *s, QWidget *parent) {
+    QGroupBox *card = uiMakeCard(s->displayName().toUpper(), parent);
+    QVBoxLayout *lay = new QVBoxLayout(card);
+    lay->setSpacing(0);
+
+    SensorCard sc;
+
+    QHBoxLayout *row = new QHBoxLayout();
+    sc.value = uiMakeBigLabel("--");
+    sc.unit  = uiMakeSmallLabel(s->unit());
+    row->addWidget(sc.value);
+    row->addWidget(sc.unit);
+    row->addStretch();
+    lay->addLayout(row);
+
+    if (s->fullScale() > 0.0) {
+        sc.bar = uiMakeBar("#26c6da");
+        lay->addWidget(sc.bar);
+    }
+
+    sc.status = new QLabel("", card);
+    sc.status->setStyleSheet(
+        "color: #ef5350; font-size: 11px; font-weight: bold; background: transparent;");
+    sc.status->setWordWrap(true);
+    sc.status->hide();
+    lay->addWidget(sc.status);
+
+    sensorCards.insert(s->id(), sc);
+    return card;
+}
 
 void AnacostiaIQ::setupDashboard()
 {
@@ -172,86 +274,6 @@ void AnacostiaIQ::setupDashboard()
         }
     )");
 
-    // ── Helper: create an info card ────────────────────────
-    auto makeCard = [](const QString &title, QWidget *parent) -> QGroupBox* {
-        QGroupBox *box = new QGroupBox(title, parent);
-        box->setStyleSheet(R"(
-            QGroupBox {
-                font-size: 11px;
-                font-weight: bold;
-                color: #78909c;
-                background-color: #21252b;
-                border: 1px solid #2d3139;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-                padding-left: 10px;
-                padding-right: 10px;
-                padding-bottom: 6px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 6px;
-            }
-            QLabel {
-                color: #cfd8dc;
-                background: transparent;
-                border: none;
-            }
-        )");
-        return box;
-    };
-
-    // ── Helper: big value label ────────────────────────────
-    auto makeBigLabel = [](const QString &text) -> QLabel* {
-        QLabel *lbl = new QLabel(text);
-        QFont f;
-        f.setPixelSize(28);
-        f.setBold(true);
-        lbl->setFont(f);
-        lbl->setStyleSheet("color: #eceff1; background: transparent;");
-        return lbl;
-    };
-
-    // ── Helper: small label ────────────────────────────────
-    auto makeSmallLabel = [](const QString &text) -> QLabel* {
-        QLabel *lbl = new QLabel(text);
-        lbl->setStyleSheet("color: #607d8b; font-size: 11px; background: transparent;");
-        return lbl;
-    };
-
-    // ── Helper: progress bar ───────────────────────────────
-    auto makeBar = [](const QString &color) -> QProgressBar* {
-        QProgressBar *bar = new QProgressBar();
-        bar->setRange(0, 100);
-        bar->setValue(0);
-        bar->setTextVisible(false);
-        bar->setFixedHeight(6);
-        bar->setStyleSheet(QString(R"(
-            QProgressBar {
-                background-color: #2d3139;
-                border: none;
-                border-radius: 3px;
-            }
-            QProgressBar::chunk {
-                background-color: %1;
-                border-radius: 3px;
-            }
-        )").arg(color));
-        return bar;
-    };
-
-    // ── Helper: indicator dot ──────────────────────────────
-    auto makeDot = [](const QString &color) -> QFrame* {
-        QFrame *dot = new QFrame();
-        dot->setFixedSize(14, 14);
-        dot->setStyleSheet(QString(
-                               "background-color: %1; border-radius: 7px; border: none;"
-                               ).arg(color));
-        return dot;
-    };
-
     // ════════════════════════════════════════════════════════
     //  Build the info panel (left column)
     // ════════════════════════════════════════════════════════
@@ -263,81 +285,35 @@ void AnacostiaIQ::setupDashboard()
     infoLayout->setContentsMargins(8, 8, 8, 8);
     infoLayout->setSpacing(0);
 
-    // ── Water Depth card ───────────────────────────────────
-    QGroupBox *depthCard = makeCard("WATER DEPTH", infoPanel);
-    QVBoxLayout *depthLay = new QVBoxLayout(depthCard);
-    depthLay->setSpacing(0);
+    // ── One card per registered sensor (built from config) ──
+    for (Sensor *s : sensors)
+        infoLayout->addWidget(buildSensorCard(s, infoPanel));
 
-    QHBoxLayout *depthRow = new QHBoxLayout();
-    depthValueLabel = makeBigLabel("--");
-    depthUnitLabel  = makeSmallLabel("cm");
-    depthRow->addWidget(depthValueLabel);
-    depthRow->addWidget(depthUnitLabel);
-    depthRow->addStretch();
-    depthLay->addLayout(depthRow);
-
-    depthBar = makeBar("#26c6da");
-    depthLay->addWidget(depthBar);
-
-    sensorStatusLabel = new QLabel("", depthCard);
-    sensorStatusLabel->setStyleSheet(
-        "color: #ef5350; font-size: 11px; font-weight: bold; background: transparent;");
-    sensorStatusLabel->setWordWrap(true);
-    sensorStatusLabel->hide();
-    depthLay->addWidget(sensorStatusLabel);
-
-    infoLayout->addWidget(depthCard);
-
-    // ── Soil Moisture card ───────────────────────────────────
-    QGroupBox *moistureCard = makeCard("SOIL MOISTURE", infoPanel);
-    QVBoxLayout *moistureLay = new QVBoxLayout(moistureCard);
-    moistureLay->setSpacing(0);
-
-    QHBoxLayout *moistureRow = new QHBoxLayout();
-    moistureValueLabel = makeBigLabel("--");
-    moistureUnitLabel  = makeSmallLabel("%");
-    moistureRow->addWidget(moistureValueLabel);
-    moistureRow->addWidget(moistureUnitLabel);
-    moistureRow->addStretch();
-    moistureLay->addLayout(moistureRow);
-
-    moistureBar = makeBar("#26c6da");
-    moistureLay->addWidget(moistureBar);
-
-    moistureStatusLabel = new QLabel("", moistureCard);
-    moistureStatusLabel->setStyleSheet(
-        "color: #ef5350; font-size: 11px; font-weight: bold; background: transparent;");
-    moistureStatusLabel->setWordWrap(true);
-    moistureStatusLabel->hide();
-    moistureLay->addWidget(moistureStatusLabel);
-
-    infoLayout->addWidget(moistureCard);
-
-    // ── Cumulative Rain card ───────────────────────────────
-    QGroupBox *rainCard = makeCard("CUMULATIVE RAIN (2-DAY)", infoPanel);
+    // ── Cumulative Rain card (fixed; derived from weather) ──
+    QGroupBox *rainCard = uiMakeCard("CUMULATIVE RAIN (2-DAY)", infoPanel);
     QVBoxLayout *rainLay = new QVBoxLayout(rainCard);
     rainLay->setSpacing(0);
 
     QHBoxLayout *rainRow = new QHBoxLayout();
-    rainValueLabel = makeBigLabel("--");
-    rainUnitLabel  = makeSmallLabel("mm");
+    rainValueLabel = uiMakeBigLabel("--");
+    rainUnitLabel  = uiMakeSmallLabel("mm");
     rainRow->addWidget(rainValueLabel);
     rainRow->addWidget(rainUnitLabel);
     rainRow->addStretch();
     rainLay->addLayout(rainRow);
 
-    rainBar = makeBar("#42a5f5");
+    rainBar = uiMakeBar("#42a5f5");
     rainLay->addWidget(rainBar);
 
     infoLayout->addWidget(rainCard);
 
     // ── Config card ────────────────────────────────────────
-    QGroupBox *threshCard = makeCard("CONFIG", infoPanel);
+    QGroupBox *threshCard = uiMakeCard("CONFIG", infoPanel);
     QGridLayout *threshGrid = new QGridLayout(threshCard);
     threshGrid->setSpacing(0);
 
     auto addThreshRow = [&](int row, const QString &label, const QString &value) {
-        QLabel *l = makeSmallLabel(label);
+        QLabel *l = uiMakeSmallLabel(label);
         QLabel *v = new QLabel(value);
         v->setStyleSheet("color: #b0bec5; font-size: 12px; font-weight: bold; background: transparent;");
         v->setAlignment(Qt::AlignRight);
@@ -395,24 +371,27 @@ void AnacostiaIQ::setupDashboard()
 
 void AnacostiaIQ::updateInfoPanels()
 {
-    // Depth
-    depthValueLabel->setText(QString::number(lastDepth, 'f', 1));
-    // Scale the bar against the configured full-scale depth. Note this
-    // is a display-only bound; the sensor reports finished depth in its
-    // own configured unit, so keep depthFullScale in that same unit.
-    double fullScale = (depthFullScale > 0.0) ? depthFullScale : 1.0;
-    int depthPct = qBound(0, static_cast<int>(lastDepth / fullScale * 100), 100);
-    depthBar->setValue(depthPct);
+    // ── Per-sensor cards (generic) ─────────────────────────
+    for (Sensor *s : sensors) {
+        if (!sensorCards.contains(s->id()))
+            continue;
+        SensorCard &c = sensorCards[s->id()];
 
-    // Moisture
-    moistureValueLabel->setText(QString::number(lastMoisture, 'f', 1));
-    int moisturePct = qBound(0, static_cast<int>(lastMoisture), 100);
-    moistureBar->setValue(moisturePct);
+        if (lastReadings.contains(s->id())) {
+            double val = lastReadings[s->id()];
+            c.value->setText(QString::number(val, 'f', 1));
+            c.value->setStyleSheet("color: #26c6da; background: transparent;");
+            if (c.bar) {
+                double fs = (s->fullScale() > 0.0) ? s->fullScale() : 100.0;
+                int pct = qBound(0, static_cast<int>(val / fs * 100), 100);
+                c.bar->setValue(pct);
+            }
+        }
+        // If no reading this tick, the tick's status handling (below)
+        // already set "--" / warning text; leave the card as-is.
+    }
 
-    depthValueLabel->setStyleSheet("color: #26c6da; background: transparent;");
-    moistureValueLabel->setStyleSheet("color: #26c6da; background: transparent;");
-
-    // Rain
+    // ── Rain card (fixed; derived from weather) ────────────
     rainValueLabel->setText(QString::number(lastCumRain, 'f', 1));
     int rainPct = qBound(0, static_cast<int>(lastCumRain / 30.0 * 100), 100);
     rainBar->setValue(rainPct);
@@ -430,44 +409,39 @@ void AnacostiaIQ::onMonitoringTick()
     // readings in lastReadings for the UI code below.
     logSensorReadings();
 
-    // ── Depth: the sensor now reports finished depth directly ──
-    // (DB logging is handled generically in logSensorReadings; here
-    //  we only update the dashboard card.)
-    if (depthSensor && depthSensor->isAvailable()) {
-        if (lastReadings.contains(depthSensor->id())) {
-            lastDepth = lastReadings[depthSensor->id()];
-            sensorStatusLabel->hide();
-            sensorFailCount = 0;
-            recordDepth(lastDepth);
+    // ── Per-sensor card status (generic) ───────────────────
+    // logSensorReadings() already did the DB writes and cached
+    // values. Here we just reflect availability/validity on each
+    // card; updateInfoPanels() fills in the values.
+    for (Sensor *s : sensors) {
+        if (!sensorCards.contains(s->id()))
+            continue;
+        SensorCard &c = sensorCards[s->id()];
+
+        if (!s->isAvailable())
+            continue;   // startup message already shown; leave as-is
+
+        if (lastReadings.contains(s->id())) {
+            c.status->hide();
         } else {
-            // available but no valid reading this tick
-            sensorFailCount++;
-            if (sensorFailCount >= MAX_SENSOR_FAILS) {
-                sensorStatusLabel->setText(
-                    "⚠ Sensor not connected or malfunctioning");
-                sensorStatusLabel->show();
-                depthValueLabel->setText("--");
-                depthValueLabel->setStyleSheet(
-                    "color: #78909c; background: transparent;");
-                depthBar->setValue(0);
-            }
+            // Available but no valid reading this tick.
+            c.status->setText("⚠ " + s->displayName() + " not responding");
+            c.status->show();
+            c.value->setText("--");
+            c.value->setStyleSheet("color: #78909c; background: transparent;");
+            if (c.bar)
+                c.bar->setValue(0);
         }
     }
 
-    // ── Moisture: UI from cached reading ───────────────────
-    if (moistureSensor && moistureSensor->isAvailable()) {
-        if (lastReadings.contains(moistureSensor->id())) {
-            lastMoisture = lastReadings[moistureSensor->id()];
-            moistureStatusLabel->hide();
-            recordMoisture(lastMoisture);
-        } else {
-            moistureStatusLabel->setText("⚠ Moisture sensor not responding");
-            moistureStatusLabel->show();
-            moistureValueLabel->setText("--");
-            moistureValueLabel->setStyleSheet(
-                "color: #78909c; background: transparent;");
-            moistureBar->setValue(0);
-        }
+    // ── Depth & moisture charts (for the sensors that have them) ──
+    if (depthSensor && lastReadings.contains(depthSensor->id())) {
+        lastDepth = lastReadings[depthSensor->id()];
+        recordDepth(lastDepth);
+    }
+    if (moistureSensor && lastReadings.contains(moistureSensor->id())) {
+        lastMoisture = lastReadings[moistureSensor->id()];
+        recordMoisture(lastMoisture);
     }
 
     // ── Weather forecast ───────────────────────────────────
