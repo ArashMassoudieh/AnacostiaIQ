@@ -289,24 +289,6 @@ void AnacostiaIQ::setupDashboard()
     for (Sensor *s : sensors)
         infoLayout->addWidget(buildSensorCard(s, infoPanel));
 
-    // ── Cumulative Rain card (fixed; derived from weather) ──
-    QGroupBox *rainCard = uiMakeCard("CUMULATIVE RAIN (2-DAY)", infoPanel);
-    QVBoxLayout *rainLay = new QVBoxLayout(rainCard);
-    rainLay->setSpacing(0);
-
-    QHBoxLayout *rainRow = new QHBoxLayout();
-    rainValueLabel = uiMakeBigLabel("--");
-    rainUnitLabel  = uiMakeSmallLabel("mm");
-    rainRow->addWidget(rainValueLabel);
-    rainRow->addWidget(rainUnitLabel);
-    rainRow->addStretch();
-    rainLay->addLayout(rainRow);
-
-    rainBar = uiMakeBar("#42a5f5");
-    rainLay->addWidget(rainBar);
-
-    infoLayout->addWidget(rainCard);
-
     // ── Config card ────────────────────────────────────────
     QGroupBox *threshCard = uiMakeCard("CONFIG", infoPanel);
     QGridLayout *threshGrid = new QGridLayout(threshCard);
@@ -336,17 +318,33 @@ void AnacostiaIQ::setupDashboard()
     QSplitter *vSplitter = new QSplitter(Qt::Vertical);
     vSplitter->addWidget(weatherChart->GetChartView());
 
-    QSplitter *hSplitterMiddle = new QSplitter(Qt::Horizontal, vSplitter);
-    hSplitterMiddle->addWidget(cumulativeChart->GetChartView());
-    hSplitterMiddle->addWidget(depthChart->GetChartView());
+    // Collect the lower charts: one per sensor. Each starts as an
+    // empty now→+7day frame (Y 0..fullScale, or 0..100 if none) and
+    // fills as readings arrive.
+    QList<QWidget*> lowerCharts;
+    for (Sensor *s : sensors) {
+        ChartContainer *cc = new ChartContainer();
+        double yMax = (s->fullScale() > 0.0) ? s->fullScale() : 100.0;
+        cc->plotEmpty(s->displayName() + " (" + s->unit() + ")", yMax);
+        lowerCharts.append(cc->GetChartView());
+        sensorChartMap.insert(s->id(), cc);
+    }
 
-    vSplitter->addWidget(moistureChart->GetChartView());
+    // Arrange them two per row: a vertical stack of horizontal rows,
+    // each row holding at most two charts.
+    for (int i = 0; i < lowerCharts.size(); i += 2) {
+        QSplitter *row = new QSplitter(Qt::Horizontal, vSplitter);
+        row->addWidget(lowerCharts[i]);
+        if (i + 1 < lowerCharts.size())
+            row->addWidget(lowerCharts[i + 1]);
+        row->setStretchFactor(0, 1);
+        row->setStretchFactor(1, 1);
+        vSplitter->addWidget(row);
+    }
 
-    vSplitter->setStretchFactor(0, 1);
-    vSplitter->setStretchFactor(1, 1);
-    vSplitter->setStretchFactor(2, 1);
-    hSplitterMiddle->setStretchFactor(0, 1);
-    hSplitterMiddle->setStretchFactor(1, 1);
+    // Equal vertical stretch for the weather chart + each row.
+    for (int i = 0; i < vSplitter->count(); ++i)
+        vSplitter->setStretchFactor(i, 1);
 
     // ════════════════════════════════════════════════════════
     //  Main layout: info panel | charts
@@ -390,12 +388,6 @@ void AnacostiaIQ::updateInfoPanels()
         // If no reading this tick, the tick's status handling (below)
         // already set "--" / warning text; leave the card as-is.
     }
-
-    // ── Rain card (fixed; derived from weather) ────────────
-    rainValueLabel->setText(QString::number(lastCumRain, 'f', 1));
-    int rainPct = qBound(0, static_cast<int>(lastCumRain / 30.0 * 100), 100);
-    rainBar->setValue(rainPct);
-    rainValueLabel->setStyleSheet("color: #42a5f5; background: transparent;");
 }
 
 // ================================================================
@@ -434,15 +426,17 @@ void AnacostiaIQ::onMonitoringTick()
         }
     }
 
-    // ── Depth & moisture charts (for the sensors that have them) ──
-    if (depthSensor && lastReadings.contains(depthSensor->id())) {
+    // ── Per-sensor charts: append this tick's reading ──────
+    for (Sensor *s : sensors) {
+        if (lastReadings.contains(s->id()))
+            recordSensorPoint(s, lastReadings[s->id()]);
+        // No reading → chart keeps its empty now→+7day frame (set at
+        // startup), or its existing history if data came earlier.
+    }
+    if (depthSensor && lastReadings.contains(depthSensor->id()))
         lastDepth = lastReadings[depthSensor->id()];
-        recordDepth(lastDepth);
-    }
-    if (moistureSensor && lastReadings.contains(moistureSensor->id())) {
+    if (moistureSensor && lastReadings.contains(moistureSensor->id()))
         lastMoisture = lastReadings[moistureSensor->id()];
-        recordMoisture(lastMoisture);
-    }
 
     // ── Weather forecast ───────────────────────────────────
     QVector<WeatherData> rainAmount =
@@ -463,15 +457,6 @@ void AnacostiaIQ::onMonitoringTick()
     dbWriter.sendWeatherData("precip_prob",   "%",   rainProb);
     dbWriter.sendWeatherData("temperature",   "C",   temp);
 
-    // ── Cumulative rain (2-day) ────────────────────────────
-    lastCumRain = calculateCumulativeValue(rainAmount, 2);
-
-    if (cumulativeRainHistory.count() > MAX_HISTORY)
-        cumulativeRainHistory.removeFirst();
-    cumulativeRainHistory.append({QDateTime::currentDateTime(), lastCumRain});
-    cumulativeChart->plotWeatherData(cumulativeRainHistory,
-                                     "Cumulative rain forecast [mm]");
-
     updateInfoPanels();
 }
 
@@ -479,18 +464,19 @@ void AnacostiaIQ::onMonitoringTick()
 //  Data Recording
 // ================================================================
 
-void AnacostiaIQ::recordDepth(double depth)
+// Append a reading to a sensor's history and replot its chart. Once
+// any data exists, the chart auto-ranges to the data (replacing the
+// empty now→+7day frame).
+void AnacostiaIQ::recordSensorPoint(Sensor *s, double value)
 {
-    if (depthHistory.count() > MAX_HISTORY)
-        depthHistory.removeFirst();
-    depthHistory.append({QDateTime::currentDateTime(), depth});
-    depthChart->plotWeatherData(depthHistory, "Water Depth (cm)");
-}
+    if (!sensorChartMap.contains(s->id()))
+        return;
 
-void AnacostiaIQ::recordMoisture(double moisture)
-{
-    if (moistureHistory.count() > MAX_HISTORY)
-        moistureHistory.removeFirst();
-    moistureHistory.append({QDateTime::currentDateTime(), moisture});
-    moistureChart->plotWeatherData(moistureHistory, "Moisture Level (%)");
+    QVector<WeatherData> &hist = sensorHistory[s->id()];
+    if (hist.count() > MAX_HISTORY)
+        hist.removeFirst();
+    hist.append({QDateTime::currentDateTime(), value});
+
+    sensorChartMap[s->id()]->plotWeatherData(
+        hist, s->displayName() + " (" + s->unit() + ")");
 }

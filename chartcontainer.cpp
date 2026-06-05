@@ -70,7 +70,45 @@ void ChartContainer::plotWeatherData(const QVector<WeatherData>& weatherData, co
     chartview->setRenderHint(QPainter::Antialiasing);
 }
 
-// Plot multiple weather data series on the same chart (multi-line chart)
+// Draw an empty chart frame: fixed time window [now, now+7 days],
+// Y-axis [0, yMax], and no data line.
+void ChartContainer::plotEmpty(const QString& yAxisTitle, double yMax) {
+    chart->removeAllSeries();
+    removeAllAxes();
+
+    chart->setTitle(yAxisTitle);
+    chart->setAnimationOptions(QChart::NoAnimation);
+
+    // X-axis: now → +7 days
+    QDateTime start = QDateTime::currentDateTime();
+    QDateTime end   = start.addDays(7);
+
+    QDateTimeAxis* axisX = new QDateTimeAxis();
+    axisX->setTitleText("Time");
+    axisX->setFormat("dd/MM HH:mm");
+    QFont xAxisFont = axisX->labelsFont();
+    xAxisFont.setPointSize(8);
+    axisX->setLabelsFont(xAxisFont);
+    axisX->setTickCount(8);
+    axisX->setLabelsAngle(90.0);
+    axisX->setRange(start, end);
+    chart->addAxis(axisX, Qt::AlignBottom);
+
+    // Y-axis: 0 → yMax
+    QValueAxis* axisY = new QValueAxis();
+    axisY->setTitleText(yAxisTitle);
+    axisY->setLabelFormat("%.1f");
+    QFont yAxisFont = axisY->labelsFont();
+    yAxisFont.setPointSize(8);
+    axisY->setLabelsFont(yAxisFont);
+    axisY->setRange(0, yMax > 0 ? yMax : 100.0);
+    chart->addAxis(axisY, Qt::AlignLeft);
+
+    chartview->setChart(chart);
+    chartview->setRenderHint(QPainter::Antialiasing);
+}
+
+
 void ChartContainer::plotWeatherDataMap(const QMap<QString, QVector<WeatherData>>& weatherDataMap) {
     // Clear existing series and axes
     chart->removeAllSeries();

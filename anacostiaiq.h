@@ -53,7 +53,6 @@ private:
     // ── State ──────────────────────────────────────────────
     double        lastDepth     = 0;
     double        lastMoisture  = 0;
-    double        lastCumRain   = 0;
 
     // ── Hardware (built by the config factory) ─────────────
     // Sensors are constructed from config.json and owned via this
@@ -83,13 +82,7 @@ private:
     WeatherFetcher fetcher;
 
     // ── Data history ───────────────────────────────────────
-    QVector<WeatherData> cumulativeRainHistory;
-    QVector<WeatherData> depthHistory;
-    QVector<WeatherData> moistureHistory;
     static const int MAX_HISTORY = 100;
-
-    void recordDepth(double depth);
-    void recordMoisture(double moisture);
 
     // ── UI setup ───────────────────────────────────────────
     void setupDashboard();
@@ -97,10 +90,14 @@ private:
     void reportSensorAvailability();
 
     // ── Charts ─────────────────────────────────────────────
+    // Fixed weather forecast chart (precip / probability / temp).
     ChartContainer *weatherChart    = new ChartContainer();
-    ChartContainer *cumulativeChart = new ChartContainer();
-    ChartContainer *depthChart      = new ChartContainer();
-    ChartContainer *moistureChart   = new ChartContainer();
+
+    // One chart per sensor, keyed by sensor id (mirrors sensorCards).
+    // Each is empty-framed (now → +7 days) until data arrives.
+    QMap<QString, ChartContainer*>      sensorChartMap;
+    QMap<QString, QVector<WeatherData>> sensorHistory;   // per-sensor series
+    void recordSensorPoint(Sensor *s, double value);     // append + replot
 
     // ── Info panel labels ──────────────────────────────────
     // ── Info panel: one card per sensor, built from config ─
@@ -115,11 +112,6 @@ private:
     };
     QMap<QString, SensorCard> sensorCards;   // keyed by sensor id
     QGroupBox *buildSensorCard(Sensor *s, QWidget *parent);
-
-    // ── Fixed (non-sensor) cards ───────────────────────────
-    QLabel *rainValueLabel;
-    QLabel *rainUnitLabel;
-    QProgressBar *rainBar;
 
     // ── Configuration ──────────────────────────────────────
     Config config;

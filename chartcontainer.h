@@ -28,6 +28,11 @@ public:
     // Plot a single weather data series
     void plotWeatherData(const QVector<WeatherData>& weatherData, const QString& yAxisTitle);
 
+    // Draw an empty chart frame (no line) with a fixed time window
+    // [now, now+7 days] and Y-axis [0, yMax]. Used before any data
+    // has arrived, or when a sensor is unavailable.
+    void plotEmpty(const QString& yAxisTitle, double yMax = 100.0);
+
     // Plot multiple weather data series on the same chart
     void plotWeatherDataMap(const QMap<QString, QVector<WeatherData>>& weatherDataMap);
 
