@@ -1,0 +1,54 @@
+{
+  "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets.",
+
+  "app": {
+    "pollIntervalSeconds": 3600,
+    "barrelDepthCm": 137.16,
+    "apiUrl": "http://54.213.147.59:5000/sensor"
+  },
+
+  "weather": {
+    "_comment": "source is 'openmeteo' or 'noaa'. Open-Meteo uses latitude/longitude and gives hourly values. NOAA uses noaaOffice + gridX/gridY (multi-hour bins).",
+    "source": "openmeteo",
+    "latitude": 38.98,
+    "longitude": -77.10,
+    "noaaOffice": "LWX",
+    "noaaGridX": 97,
+    "noaaGridY": 71
+  },
+
+  "sensors": [
+    {
+      "type": "distance",
+      "id": "hcsr04_depth",
+      "unit": "in",
+      "name": "HC-SR04 Depth",
+      "params": {
+        "chip": "/dev/gpiochip0",
+        "trigPin": 17,
+        "echoPin": 27,
+        "totalLength": 48
+      }
+    },
+    {
+      "type": "maxbotix",
+      "id": "maxbotix_depth",
+      "unit": "in",
+      "name": "Standpipe Depth",
+      "params": {
+        "device": "/dev/ttyAMA0",
+        "totalLength": 48
+      }
+    },
+    {
+      "type": "moisture",
+      "id": "moisture_sensor",
+      "unit": "%",
+      "name": "Soil Moisture",
+      "params": {
+        "spiChannel": 0,
+        "adcChannel": 0
+      }
+    }
+  ]
+}

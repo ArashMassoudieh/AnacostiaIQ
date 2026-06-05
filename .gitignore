@@ -30,3 +30,15 @@
 *.exe
 *.out
 *.app
+
+build/debug/.qtc_clangd/.cache/clangd/index/
+
+build/debug/.qtc_clangd/
+
+build/debug/
+
+HC_SR04_ultrasonic_sensor_3/build/Desktop_Qt_6_8_2-Debug/.qtc_clangd/.cache/clangd/index/
+
+HC_SR04_ultrasonic_sensor_3/build/Desktop_Qt_6_8_2-Debug/.qtc_clangd/
+
+HC_SR04_ultrasonic_sensor_3/build/Desktop_Qt_6_8_2-Debug/
