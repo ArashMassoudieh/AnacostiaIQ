@@ -31,6 +31,17 @@
       }
     },
     {
+      "type": "distance",
+      "id": "MB7389_100_depth",
+      "unit": "in",
+      "name": "MB7389-100 Depth",
+      "params": {
+        "chip": "/dev/gpiochip0",
+        "wireSerialPin": 15,
+        "totalLength": 48
+      }
+    },
+    {
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
