@@ -4,7 +4,7 @@ QT       += charts
 greaterThan(QT_MAJOR_VERSION, 4):
 QT += widgets network charts
 
-CONFIG += c++11
+CONFIG += c++17
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -16,9 +16,9 @@ CONFIG += c++11
 # the GUI runs normally with simulated/absent sensors.
 #
 # To force a Pi build manually, run qmake with:  DEFINES+=RasPi
-contains(QMAKE_HOST.arch, arm.*)|contains(QMAKE_HOST.arch, aarch64) {
-    DEFINES += RasPi
-}
+
+DEFINES += RasPi
+
 
 DEFINES += Qt5
 
@@ -51,10 +51,10 @@ HEADERS += \
     anacostiaiq.h
 
 contains(DEFINES, RasPi) {
-    # wiringPi: MoistureSensor (SPI)
-    LIBS += -lwiringPi
     # libgpiod v2 C++ bindings: DistanceSensor (HC-SR04 trig/echo)
     LIBS += -lgpiodcxx
+    # MoistureSensor uses Linux spidev (ioctl) — no library needed
+    # MaxbotixSensor uses POSIX termios UART — no library needed
 }
 
 # Default rules for deployment.
