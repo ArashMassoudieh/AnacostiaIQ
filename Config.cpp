@@ -94,9 +94,21 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
                                         totalLength, chip);
         }
         else if (type == "moisture") {
-            int spiChannel = params.value("spiChannel").toInt(0);
-            int adcChannel = params.value("adcChannel").toInt(0);
-            sensor = new MoistureSensor(id, unit, name, spiChannel, adcChannel);
+            QString chip = params.value("chip").toString("/dev/gpiochip0");
+
+            QJsonArray dp = params.value("dataPins").toArray();
+            QVector<int> dataPins;
+            for (const QJsonValue &p : dp)
+                dataPins.append(p.toInt());
+
+            int wrPin   = params.value("wrPin").toInt(-1);
+            int rdPin   = params.value("rdPin").toInt(-1);
+            int intrPin = params.value("intrPin").toInt(-1);
+            int adcDry  = params.value("adcDry").toInt(645);
+            int adcWet  = params.value("adcWet").toInt(160);
+
+            sensor = new MoistureSensor(id, unit, name, chip, dataPins,
+                                        wrPin, rdPin, intrPin, adcDry, adcWet);
         }
         else if (type == "maxbotix") {
             QString device     = params.value("device").toString("/dev/ttyAMA0");

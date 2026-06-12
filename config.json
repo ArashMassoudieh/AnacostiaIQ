@@ -1,12 +1,10 @@
 {
   "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets.",
-
   "app": {
-    "pollIntervalSeconds": 3600,
+    "pollIntervalSeconds": 10,
     "barrelDepthCm": 137.16,
     "apiUrl": "http://54.213.147.59:5000/sensor"
   },
-
   "weather": {
     "_comment": "source is 'openmeteo' or 'noaa'. Open-Meteo uses latitude/longitude and gives hourly values. NOAA uses noaaOffice + gridX/gridY (multi-hour bins).",
     "source": "openmeteo",
@@ -16,7 +14,6 @@
     "noaaGridX": 97,
     "noaaGridY": 71
   },
-
   "sensors": [
     {
       "type": "distance",
@@ -31,6 +28,17 @@
       }
     },
     {
+      "type": "distance",
+      "id": "MB7389_100_depth",
+      "unit": "in",
+      "name": "MB7389-100 Depth",
+      "params": {
+        "chip": "/dev/gpiochip0",
+        "wireSerialPin": 15,
+        "totalLength": 48
+      }
+    },
+    {
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
@@ -41,13 +49,18 @@
       }
     },
     {
-      "type": "moisture",
       "id": "moisture_sensor",
+      "type": "moisture",
       "unit": "%",
       "name": "Soil Moisture",
       "params": {
-        "spiChannel": 0,
-        "adcChannel": 0
+        "chip": "/dev/gpiochip0",
+        "dataPins": [5, 6, 13, 19, 26, 16, 20, 21],
+        "wrPin": 23,
+        "rdPin": 24,
+        "intrPin": 25,
+        "adcDry": 105,
+        "adcWet": 32
       }
     }
   ]

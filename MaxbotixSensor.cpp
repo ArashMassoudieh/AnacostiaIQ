@@ -103,6 +103,7 @@ void MaxbotixSensor::cleanup() {
 
 double MaxbotixSensor::measure() {
 #ifdef RasPi
+    tcflush(m_fd, TCIFLUSH);
     if (m_fd < 0)
         return -1;
 
@@ -142,10 +143,10 @@ double MaxbotixSensor::measure() {
                     }
 
                     double measured = mmToUnit(rangeMm);
-                    double depth = m_totalLength - measured;
-                    if (depth < 0)
-                        depth = 0;
+                    double depth = m_totalLength - measured;   // convert distance → water depth
+                    qDebug() << "MaxbotixSensor: distance =" << measured << "depth =" << depth;
                     return depth;
+
                 }
             } else {
                 state = WaitR;   // malformed frame, resync
