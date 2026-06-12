@@ -9,9 +9,15 @@
 //
 //  Pins/calibration come from config.json via the factory.
 /////////////////////////////////////////////////////////////
-
 #include "MoistureSensor.h"
 #include <cmath>
+#ifdef RasPi
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
+#include <sys/ioctl.h>
+#include <linux/spi/spidev.h>
+#endif
 
 #ifdef RasPi
 #include <thread>

@@ -5,10 +5,8 @@
 //  libgpiod. NOT SPI. Pin assignments and calibration are passed
 //  in from config.json via the factory.
 /////////////////////////////////////////////////////////////
-
 #ifndef MOISTURESENSOR_H
 #define MOISTURESENSOR_H
-
 #include "Sensor.h"
 #include <QString>
 #include <QVector>
@@ -51,5 +49,4 @@ private:
     std::unique_ptr<gpiod::line_request>  m_intrReq;
 #endif
 };
-
 #endif // MOISTURESENSOR_H
