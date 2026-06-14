@@ -46,6 +46,30 @@
       "color": "#8d6e63",
       "area_color": "#2d8d6e63",
       "floor_at_zero": true
-    }
+    },
+	{
+	  "id": "temperature",
+	  "name": "Temperature",
+	  "unit": "°C",
+	  "color": "#ef5350",
+	  "area_color": "#40ef5350",
+	  "floor_at_zero": false
+	},
+	{
+	  "id": "precip_amount",
+	  "name": "Precipitation Amount",
+	  "unit": "mm",
+	  "color": "#42a5f5",
+	  "area_color": "#2d42a5f5",
+	  "floor_at_zero": true
+	},
+	{
+	  "id": "precip_prob",
+	  "name": "Precipitation Probability",
+	  "unit": "%",
+	  "color": "#ab47bc",
+	  "area_color": "#28ab47bc",
+	  "floor_at_zero": true
+	}
   ]
 }
