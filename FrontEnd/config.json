@@ -1,0 +1,51 @@
+{
+  "_comment": "Sensor Dashboard (viewer) configuration. Lists the same sensors defined on the Pi side so the dashboard charts them. Edit to choose which sensors appear and how they look — no recompile. Anything omitted falls back to a built-in default.",
+
+  "api_url": "http://54.213.147.59:5000",
+  "window_title": "AnacostiaIQ — Sensor Dashboard",
+
+  "refresh_interval_sec": 60,
+  "auto_refresh": false,
+  "scrollable_charts": false,
+
+  "default_range": {
+    "days_back": 7,
+    "days_ahead": 7
+  },
+
+  "_sensors_note": "Only the sensors listed here are shown, in this order. Use a plain string for defaults, or an object to override name/unit/colour/axis. Set visible:false to keep an entry on file but hide its chart.",
+  "sensors": [
+    {
+      "id": "hcsr04_depth",
+      "name": "HC-SR04 Depth",
+      "unit": "in",
+      "color": "#26c6da",
+      "area_color": "#2826c6da",
+      "floor_at_zero": false
+    },
+    {
+      "id": "MB7389_100_depth",
+      "name": "MB7389-100 Depth",
+      "unit": "in",
+      "color": "#4dd0e1",
+      "area_color": "#284dd0e1",
+      "floor_at_zero": false
+    },
+    {
+      "id": "maxbotix_depth",
+      "name": "Standpipe Depth",
+      "unit": "in",
+      "color": "#26a69a",
+      "area_color": "#2826a69a",
+      "floor_at_zero": false
+    },
+    {
+      "id": "moisture_sensor",
+      "name": "Soil Moisture",
+      "unit": "%",
+      "color": "#8d6e63",
+      "area_color": "#2d8d6e63",
+      "floor_at_zero": true
+    }
+  ]
+}

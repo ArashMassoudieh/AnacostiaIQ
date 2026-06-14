@@ -17,7 +17,7 @@ CONFIG += c++17
 #
 # To force a Pi build manually, run qmake with:  DEFINES+=RasPi
 
-DEFINES += RasPi
+#DEFINES += RasPi
 
 
 DEFINES += Qt5
