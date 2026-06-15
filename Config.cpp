@@ -45,6 +45,8 @@ bool Config::load(const QString &path)
 
     // ── Weather settings (each optional; falls back to default) ─
     QJsonObject weather = root.value("weather").toObject();
+    // Weather interval defaults to the app-level poll interval when absent.
+    m_weatherInterval = weather.value("intervalSeconds").toInt(m_pollInterval);
     m_weatherSource = weather.value("source").toString(m_weatherSource);
     m_lat           = weather.value("latitude").toDouble(m_lat);
     m_lon           = weather.value("longitude").toDouble(m_lon);
@@ -77,6 +79,10 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
         const QString unit = obj.value("unit").toString();
         const QString name = obj.value("name").toString(id);
         QJsonObject params = obj.value("params").toObject();
+
+        // Per-sensor poll interval; falls back to the app-level default
+        // when the entry omits "intervalSeconds".
+        const int interval = obj.value("intervalSeconds").toInt(m_pollInterval);
 
         if (id.isEmpty() || type.isEmpty()) {
             qWarning() << "Config: skipping sensor with missing type/id";
@@ -124,8 +130,12 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
         if (parent && sensor)
             sensor->setParent(parent);
 
+        if (sensor)
+            sensor->setPollIntervalSeconds(interval);
+
         result.append(sensor);
-        qDebug() << "Config: created" << type << "sensor" << id;
+        qDebug() << "Config: created" << type << "sensor" << id
+                 << "| interval(s):" << interval;
     }
 
     return result;

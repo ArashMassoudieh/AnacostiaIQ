@@ -43,11 +43,15 @@ public:
     // longer used in the depth math.
     double barrelDepth = 137.16;                        // cm
 
-    int pollInterval  = 3600;                           // Sensor polling interval (seconds)
+    int pollInterval  = 3600;                           // Default sensor polling interval (seconds)
+    int weatherInterval = 3600;                         // Weather polling interval (seconds)
     bool sensorEnabled      = true;
 
 private slots:
-    void onMonitoringTick();
+    // Poll a single sensor: measure, log to DB, update its card + chart.
+    void pollSensor(Sensor *s);
+    // Poll the weather group: fetch all variables, plot, write to DB.
+    void pollWeather();
 
 private:
     // ── State ──────────────────────────────────────────────
@@ -62,7 +66,7 @@ private:
     QVector<Sensor*> sensors;
     void loadConfiguration();   // read config.json into settings + sensors
     void registerSensors();     // (re)build the sensor list from config
-    void logSensorReadings();   // generic read + DB write for all sensors
+    void startPolling();        // create + start a timer per sensor + weather
 
     // Convenience handles into 'sensors', resolved by id after the
     // factory runs. Null if the corresponding sensor isn't configured.
@@ -76,7 +80,10 @@ private:
     QMap<QString, double> lastReadings;
 
     // ── Timers ─────────────────────────────────────────────
-    QTimer *monitoringTimer;
+    // One timer per sensor (each on its own interval) plus a single
+    // weather timer. Parented to this, so they're cleaned up with it.
+    QVector<QTimer*> sensorTimers;
+    QTimer *weatherTimer = nullptr;
 
     // ── Weather ────────────────────────────────────────────
     WeatherFetcher fetcher;

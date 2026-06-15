@@ -61,6 +61,13 @@ public:
     QString unit() const        { return m_unit; }
     QString displayName() const { return m_name; }
 
+    // Per-sensor polling interval (seconds). 0 means "not set" — the
+    // app falls back to the global app.pollIntervalSeconds. Set from
+    // config.json by the sensor factory. Lets fast-changing variables
+    // poll more often than slow ones.
+    int  pollIntervalSeconds() const     { return m_intervalSeconds; }
+    void setPollIntervalSeconds(int s)   { m_intervalSeconds = s; }
+
     // Optional display full-scale (e.g. a depth sensor's total length,
     // in its reported unit). 0 means "not applicable / unknown" — the
     // UI should fall back to a default. Subclasses set it via
@@ -83,6 +90,7 @@ private:
     QString m_name;
     bool    m_available = false;
     double  m_fullScale = 0.0;
+    int     m_intervalSeconds = 0;   // 0 = use app-level default
 };
 
 #endif // SENSOR_H

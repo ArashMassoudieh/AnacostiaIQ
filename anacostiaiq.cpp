@@ -21,11 +21,6 @@ AnacostiaIQ::AnacostiaIQ(QWidget *parent)
     // Load config.json first so settings drive the UI and sensors.
     loadConfiguration();
 
-    // Timer
-    monitoringTimer = new QTimer(this);
-    connect(monitoringTimer, &QTimer::timeout,
-            this, &AnacostiaIQ::onMonitoringTick);
-
     // Build the sensor registry from config BEFORE the dashboard,
     // so the info panel can create one card per registered sensor.
     registerSensors();
@@ -44,8 +39,8 @@ AnacostiaIQ::AnacostiaIQ(QWidget *parent)
     // Per-sensor dashboard messaging (marks any unavailable sensor)
     reportSensorAvailability();
 
-    monitoringTimer->start(pollInterval * 1000);
-    QTimer::singleShot(0, this, &AnacostiaIQ::onMonitoringTick);
+    // Start one timer per sensor (each on its own interval) + weather.
+    startPolling();
 }
 
 AnacostiaIQ::~AnacostiaIQ()
@@ -62,8 +57,9 @@ void AnacostiaIQ::loadConfiguration()
     const QString path = "config.json";
 
     if (config.load(path)) {
-        pollInterval = config.pollIntervalSeconds();
-        barrelDepth  = config.barrelDepthCm();
+        pollInterval    = config.pollIntervalSeconds();
+        weatherInterval = config.weatherIntervalSeconds();
+        barrelDepth     = config.barrelDepthCm();
         dbWriter.setApiUrl(config.apiUrl());
 
         // Weather source + location
@@ -103,21 +99,31 @@ Sensor *AnacostiaIQ::findSensor(const QString &id) const
     return nullptr;
 }
 
-// Generic read + DB write for every registered sensor.
-// Owns all sensor DB writes; the specific UI code below does not
-// write to the DB, to avoid duplicate readings.
-void AnacostiaIQ::logSensorReadings()
+// Create and start a timer for each sensor on its own interval, plus
+// one weather timer. Each item also polls once immediately so the
+// dashboard fills in without waiting a full interval.
+void AnacostiaIQ::startPolling()
 {
-    lastReadings.clear();
     for (Sensor *s : sensors) {
-        if (!s->isAvailable())
-            continue;                       // skip missing sensors
-        double value = s->measure();
-        if (!Sensor::isValid(value))
-            continue;                       // skip invalid readings
-        lastReadings[s->id()] = value;      // cache for UI reuse
-        dbWriter.sendReading(s->id(), value, s->unit());
+        // Per-sensor interval; fall back to the app default if unset.
+        const int iv = (s->pollIntervalSeconds() > 0)
+                           ? s->pollIntervalSeconds()
+                           : pollInterval;
+
+        QTimer *t = new QTimer(this);
+        connect(t, &QTimer::timeout, this, [this, s]() { pollSensor(s); });
+        t->start(iv * 1000);
+        sensorTimers.append(t);
+
+        // Immediate first reading.
+        QTimer::singleShot(0, this, [this, s]() { pollSensor(s); });
     }
+
+    // Weather group on its own interval.
+    weatherTimer = new QTimer(this);
+    connect(weatherTimer, &QTimer::timeout, this, &AnacostiaIQ::pollWeather);
+    weatherTimer->start(weatherInterval * 1000);
+    QTimer::singleShot(0, this, &AnacostiaIQ::pollWeather);
 }
 
 // ================================================================
@@ -304,8 +310,9 @@ void AnacostiaIQ::setupDashboard()
         return v;
     };
 
-    addThreshRow(0, "Barrel depth",   QString("%1 cm").arg(barrelDepth));
-    addThreshRow(1, "Poll interval",  QString("%1 s").arg(pollInterval));
+    addThreshRow(0, "Barrel depth",      QString("%1 cm").arg(barrelDepth));
+    addThreshRow(1, "Default interval",  QString("%1 s").arg(pollInterval));
+    addThreshRow(2, "Weather interval",  QString("%1 s").arg(weatherInterval));
 
     infoLayout->addWidget(threshCard);
 
@@ -391,54 +398,69 @@ void AnacostiaIQ::updateInfoPanels()
 }
 
 // ================================================================
-//  MONITORING tick
+//  Per-sensor poll (driven by that sensor's own timer)
 // ================================================================
 
-void AnacostiaIQ::onMonitoringTick()
+// Read one sensor, write it to the DB, and update its card + chart.
+// Owns the DB write for this sensor (no duplicate writes elsewhere).
+void AnacostiaIQ::pollSensor(Sensor *s)
 {
-    // ── Read + log every registered sensor (raw values) ────
-    // This owns all generic sensor DB writes and caches the
-    // readings in lastReadings for the UI code below.
-    logSensorReadings();
+    if (!s)
+        return;
 
-    // ── Per-sensor card status (generic) ───────────────────
-    // logSensorReadings() already did the DB writes and cached
-    // values. Here we just reflect availability/validity on each
-    // card; updateInfoPanels() fills in the values.
-    for (Sensor *s : sensors) {
-        if (!sensorCards.contains(s->id()))
-            continue;
-        SensorCard &c = sensorCards[s->id()];
+    SensorCard *c = sensorCards.contains(s->id())
+                        ? &sensorCards[s->id()]
+                        : nullptr;
 
-        if (!s->isAvailable())
-            continue;   // startup message already shown; leave as-is
+    if (!s->isAvailable())
+        return;   // startup message already shown; leave the card as-is
 
-        if (lastReadings.contains(s->id())) {
-            c.status->hide();
-        } else {
-            // Available but no valid reading this tick.
-            c.status->setText("⚠ " + s->displayName() + " not responding");
-            c.status->show();
-            c.value->setText("--");
-            c.value->setStyleSheet("color: #78909c; background: transparent;");
-            if (c.bar)
-                c.bar->setValue(0);
+    const double value = s->measure();
+
+    if (!Sensor::isValid(value)) {
+        // Available but no valid reading this tick.
+        lastReadings.remove(s->id());
+        if (c) {
+            c->status->setText("⚠ " + s->displayName() + " not responding");
+            c->status->show();
+            c->value->setText("--");
+            c->value->setStyleSheet("color: #78909c; background: transparent;");
+            if (c->bar)
+                c->bar->setValue(0);
+        }
+        return;
+    }
+
+    // Valid reading: cache, persist, and reflect on the UI.
+    lastReadings[s->id()] = value;
+    dbWriter.sendReading(s->id(), value, s->unit());
+
+    if (c) {
+        c->status->hide();
+        c->value->setText(QString::number(value, 'f', 1));
+        c->value->setStyleSheet("color: #26c6da; background: transparent;");
+        if (c->bar) {
+            double fs = (s->fullScale() > 0.0) ? s->fullScale() : 100.0;
+            int pct = qBound(0, static_cast<int>(value / fs * 100), 100);
+            c->bar->setValue(pct);
         }
     }
 
-    // ── Per-sensor charts: append this tick's reading ──────
-    for (Sensor *s : sensors) {
-        if (lastReadings.contains(s->id()))
-            recordSensorPoint(s, lastReadings[s->id()]);
-        // No reading → chart keeps its empty now→+7day frame (set at
-        // startup), or its existing history if data came earlier.
-    }
-    if (depthSensor && lastReadings.contains(depthSensor->id()))
-        lastDepth = lastReadings[depthSensor->id()];
-    if (moistureSensor && lastReadings.contains(moistureSensor->id()))
-        lastMoisture = lastReadings[moistureSensor->id()];
+    recordSensorPoint(s, value);
 
-    // ── Weather forecast ───────────────────────────────────
+    // Keep the legacy convenience values in sync.
+    if (depthSensor && s == depthSensor)
+        lastDepth = value;
+    if (moistureSensor && s == moistureSensor)
+        lastMoisture = value;
+}
+
+// ================================================================
+//  Weather poll (driven by the weather timer)
+// ================================================================
+
+void AnacostiaIQ::pollWeather()
+{
     QVector<WeatherData> rainAmount =
         fetcher.getWeatherPrediction(datatype::PrecipitationAmount);
     QVector<WeatherData> rainProb =
@@ -456,8 +478,6 @@ void AnacostiaIQ::onMonitoringTick()
     dbWriter.sendWeatherData("precip_amount", "mm",  rainAmount);
     dbWriter.sendWeatherData("precip_prob",   "%",   rainProb);
     dbWriter.sendWeatherData("temperature",   "C",   temp);
-
-    updateInfoPanels();
 }
 
 // ================================================================

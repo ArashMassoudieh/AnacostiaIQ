@@ -32,6 +32,9 @@ public:
     QString apiUrl() const              { return m_apiUrl; }
 
     // ── Weather settings ───────────────────────────────────
+    // Weather is polled as a group on its own interval (defaults to
+    // app.pollIntervalSeconds if "weather.intervalSeconds" is absent).
+    int     weatherIntervalSeconds() const { return m_weatherInterval; }
     QString weatherSource() const       { return m_weatherSource; }
     double  latitude() const            { return m_lat; }
     double  longitude() const           { return m_lon; }
@@ -52,6 +55,7 @@ private:
     QString m_apiUrl       = "http://54.213.147.59:5000/sensor";
 
     // Weather
+    int     m_weatherInterval = 3600;   // falls back to m_pollInterval on load
     QString m_weatherSource = "openmeteo";
     double  m_lat           = 38.98;
     double  m_lon           = -77.10;
