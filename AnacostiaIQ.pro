@@ -32,6 +32,7 @@ SOURCES += \
     DatabaseWriter.cpp \
     Config.cpp \
     AdcBus.cpp \
+    RainPolicy.cpp \
     DistanceSensor.cpp \
     MoistureSensor.cpp \
     MaxbotixSensor.cpp \
@@ -45,6 +46,7 @@ HEADERS += \
     Config.h \
     Sensor.h \
     AdcBus.h \
+    RainPolicy.h \
     DistanceSensor.h \
     MoistureSensor.h \
     MaxbotixSensor.h \

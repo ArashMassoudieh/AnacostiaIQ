@@ -7,6 +7,7 @@
 
 #include <QMainWindow>
 #include "WeatherFetcher.h"
+#include "RainPolicy.h"
 #include "chartcontainer.h"
 #include "Sensor.h"
 #include "DistanceSensor.h"
@@ -16,6 +17,7 @@
 #include <QTimer>
 #include <QVector>
 #include <QMap>
+#include <QHash>
 #include <QLabel>
 #include <QGroupBox>
 #include <QFrame>
@@ -47,6 +49,17 @@ public:
     int weatherInterval = 3600;                         // Weather polling interval (seconds)
     bool sensorEnabled      = true;
 
+    // ── Adaptive polling (loaded from config.json "adaptive") ──
+    // When the forecast shows no rain within lookaheadHours, every
+    // sensor's interval is multiplied by idleFactor ("low frequency"
+    // mode). Rain in the forecast returns them to their base
+    // intervals ("high frequency"). The weather poll itself never
+    // scales — it's the thing that notices rain coming back.
+    bool   adaptiveEnabled = true;
+    int    idleFactor      = 10;
+    double rainThreshold   = 0.0;      // % probability above which it "rains"
+    int    lookaheadHours  = 24;
+
 private slots:
     // Poll a single sensor: measure, log to DB, update its card + chart.
     void pollSensor(Sensor *s);
@@ -68,6 +81,21 @@ private:
     void registerSensors();     // (re)build the sensor list from config
     void startPolling();        // create + start a timer per sensor + weather
 
+    // ── Adaptive polling ───────────────────────────────────
+    // lowFrequency is the current mode; haveForecast distinguishes
+    // "rain is coming" from "we haven't heard from the forecast yet",
+    // which both leave us at the base intervals.
+    bool lowFrequency = false;
+    bool haveForecast = false;
+
+    // Base interval scaled by idleFactor when in low-frequency mode.
+    int  effectiveIntervalSeconds(Sensor *s) const;
+    // Restart every sensor timer on the new cadence. No-op unless the
+    // mode actually changed — QTimer::start() resets the countdown, so
+    // calling this on every weather tick would starve any sensor whose
+    // interval is longer than the weather interval.
+    void setLowFrequencyMode(bool low);
+
     // Convenience handles into 'sensors', resolved by id after the
     // factory runs. Null if the corresponding sensor isn't configured.
     Sensor *depthSensor    = nullptr;
@@ -82,7 +110,9 @@ private:
     // ── Timers ─────────────────────────────────────────────
     // One timer per sensor (each on its own interval) plus a single
     // weather timer. Parented to this, so they're cleaned up with it.
-    QVector<QTimer*> sensorTimers;
+    // Keyed by sensor so a mode change can look up each timer's owner
+    // and recompute its interval.
+    QHash<Sensor*, QTimer*> sensorTimers;
     QTimer *weatherTimer = nullptr;
 
     // ── Weather ────────────────────────────────────────────
@@ -119,6 +149,14 @@ private:
     };
     QMap<QString, SensorCard> sensorCards;   // keyed by sensor id
     QGroupBox *buildSensorCard(Sensor *s, QWidget *parent);
+
+    // ── Polling-mode card ──────────────────────────────────
+    // Shows HIGH / LOW frequency and why, so the scaling is never a
+    // silent behaviour change.
+    QLabel *modeValue  = nullptr;
+    QLabel *modeDetail = nullptr;
+    QGroupBox *buildModeCard(QWidget *parent);
+    void updateModeCard();
 
     // ── Configuration ──────────────────────────────────────
     Config config;

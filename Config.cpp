@@ -46,6 +46,27 @@ bool Config::load(const QString &path)
     m_barrelDepth  = app.value("barrelDepthCm").toDouble(m_barrelDepth);
     m_apiUrl       = app.value("apiUrl").toString(m_apiUrl);
 
+    // ── Adaptive polling (each optional; falls back to default) ─
+    QJsonObject adaptive = root.value("adaptive").toObject();
+    m_adaptiveEnabled = adaptive.value("enabled").toBool(m_adaptiveEnabled);
+    m_idleFactor      = adaptive.value("idleFactor").toInt(m_idleFactor);
+    m_rainThreshold   = adaptive.value("rainProbabilityThreshold")
+                            .toDouble(m_rainThreshold);
+    m_lookaheadHours  = adaptive.value("lookaheadHours").toInt(m_lookaheadHours);
+
+    // A factor below 1 would speed sensors up when it's dry, which is
+    // the opposite of the intent; 1 disables the scaling.
+    if (m_idleFactor < 1) {
+        qWarning() << "Config: adaptive.idleFactor" << m_idleFactor
+                   << "< 1 — clamping to 1 (no scaling)";
+        m_idleFactor = 1;
+    }
+    if (m_lookaheadHours < 1) {
+        qWarning() << "Config: adaptive.lookaheadHours" << m_lookaheadHours
+                   << "< 1 — clamping to 1";
+        m_lookaheadHours = 1;
+    }
+
     // ── Weather settings (each optional; falls back to default) ─
     QJsonObject weather = root.value("weather").toObject();
     // Weather interval defaults to the app-level poll interval when absent.

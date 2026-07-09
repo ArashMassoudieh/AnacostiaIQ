@@ -10,6 +10,8 @@
 #include <QMap>
 #include <QSplitter>
 #include <QFont>
+#include <QDateTime>
+#include <algorithm>
 
 // ================================================================
 //  Constructor / Destructor
@@ -62,6 +64,12 @@ void AnacostiaIQ::loadConfiguration()
         barrelDepth     = config.barrelDepthCm();
         dbWriter.setApiUrl(config.apiUrl());
 
+        // Adaptive polling
+        adaptiveEnabled = config.adaptiveEnabled();
+        idleFactor      = config.idleIntervalFactor();
+        rainThreshold   = config.rainProbabilityThreshold();
+        lookaheadHours  = config.rainLookaheadHours();
+
         // Weather source + location
         fetcher.setSourceFromString(config.weatherSource());
         fetcher.setLocation(config.latitude(), config.longitude());
@@ -99,31 +107,70 @@ Sensor *AnacostiaIQ::findSensor(const QString &id) const
     return nullptr;
 }
 
+// A sensor's base interval, scaled by idleFactor when the forecast is
+// dry. Clamped to a day so a large idleFactor can't overflow the
+// millisecond int that QTimer::start() takes.
+int AnacostiaIQ::effectiveIntervalSeconds(Sensor *s) const
+{
+    const int base = (s->pollIntervalSeconds() > 0)
+                         ? s->pollIntervalSeconds()
+                         : pollInterval;
+
+    if (!adaptiveEnabled || !lowFrequency)
+        return base;
+
+    static const int MAX_INTERVAL_SEC = 24 * 3600;
+    const qint64 scaled = static_cast<qint64>(base) * idleFactor;
+    return static_cast<int>(qMin<qint64>(scaled, MAX_INTERVAL_SEC));
+}
+
 // Create and start a timer for each sensor on its own interval, plus
 // one weather timer. Each item also polls once immediately so the
 // dashboard fills in without waiting a full interval.
 void AnacostiaIQ::startPolling()
 {
     for (Sensor *s : sensors) {
-        // Per-sensor interval; fall back to the app default if unset.
-        const int iv = (s->pollIntervalSeconds() > 0)
-                           ? s->pollIntervalSeconds()
-                           : pollInterval;
-
         QTimer *t = new QTimer(this);
         connect(t, &QTimer::timeout, this, [this, s]() { pollSensor(s); });
-        t->start(iv * 1000);
-        sensorTimers.append(t);
+        t->start(effectiveIntervalSeconds(s) * 1000);
+        sensorTimers.insert(s, t);
 
         // Immediate first reading.
         QTimer::singleShot(0, this, [this, s]() { pollSensor(s); });
     }
 
-    // Weather group on its own interval.
+    // Weather group on its own interval. Never scaled: this poll is
+    // what detects rain returning and pulls us back to high frequency.
     weatherTimer = new QTimer(this);
     connect(weatherTimer, &QTimer::timeout, this, &AnacostiaIQ::pollWeather);
     weatherTimer->start(weatherInterval * 1000);
     QTimer::singleShot(0, this, &AnacostiaIQ::pollWeather);
+}
+
+// ================================================================
+//  Adaptive polling
+// ================================================================
+
+// Switch cadence. Restarts every sensor timer, so it must only run on
+// a real transition: QTimer::start() resets the countdown, and calling
+// this on each weather tick would starve any sensor whose interval is
+// longer than the weather interval.
+void AnacostiaIQ::setLowFrequencyMode(bool low)
+{
+    if (low == lowFrequency) {
+        updateModeCard();   // "awaiting forecast" -> a real reason
+        return;
+    }
+
+    lowFrequency = low;
+
+    for (auto it = sensorTimers.cbegin(); it != sensorTimers.cend(); ++it)
+        it.value()->start(effectiveIntervalSeconds(it.key()) * 1000);
+
+    qInfo() << "Adaptive polling:" << (low ? "LOW" : "HIGH") << "frequency mode"
+            << "— sensor intervals ×" << (low ? idleFactor : 1);
+
+    updateModeCard();
 }
 
 // ================================================================
@@ -265,6 +312,62 @@ QGroupBox *AnacostiaIQ::buildSensorCard(Sensor *s, QWidget *parent) {
     return card;
 }
 
+// Card showing the current polling cadence and the reason for it.
+QGroupBox *AnacostiaIQ::buildModeCard(QWidget *parent)
+{
+    QGroupBox *card = uiMakeCard("POLLING MODE", parent);
+    QVBoxLayout *lay = new QVBoxLayout(card);
+    lay->setSpacing(2);
+
+    modeValue = new QLabel("--", card);
+    QFont f;
+    f.setPixelSize(18);
+    f.setBold(true);
+    modeValue->setFont(f);
+
+    modeDetail = new QLabel("", card);
+    modeDetail->setStyleSheet(
+        "color: #607d8b; font-size: 11px; background: transparent;");
+    modeDetail->setWordWrap(true);
+
+    lay->addWidget(modeValue);
+    lay->addWidget(modeDetail);
+
+    updateModeCard();
+    return card;
+}
+
+void AnacostiaIQ::updateModeCard()
+{
+    if (!modeValue || !modeDetail)
+        return;   // called before the dashboard exists
+
+    if (!adaptiveEnabled) {
+        modeValue->setText("FIXED");
+        modeValue->setStyleSheet("color: #78909c; background: transparent;");
+        modeDetail->setText("adaptive polling disabled");
+        return;
+    }
+
+    if (lowFrequency) {
+        modeValue->setText("LOW FREQUENCY");
+        modeValue->setStyleSheet("color: #ffa726; background: transparent;");
+        modeDetail->setText(
+            QString("no rain above %1%% in the next %2 h — "
+                    "sensor intervals ×%3")
+                .arg(rainThreshold).arg(lookaheadHours).arg(idleFactor));
+        return;
+    }
+
+    modeValue->setText("HIGH FREQUENCY");
+    modeValue->setStyleSheet("color: #26c6da; background: transparent;");
+    modeDetail->setText(
+        haveForecast
+            ? QString("rain above %1%% within %2 h — base intervals")
+                  .arg(rainThreshold).arg(lookaheadHours)
+            : QString("no usable forecast yet — base intervals"));
+}
+
 void AnacostiaIQ::setupDashboard()
 {
     setWindowTitle("AnacostiaIQ");
@@ -291,7 +394,9 @@ void AnacostiaIQ::setupDashboard()
     infoLayout->setContentsMargins(8, 8, 8, 8);
     infoLayout->setSpacing(0);
 
-    // ── One card per registered sensor (built from config) ──
+    // ── Polling mode, then one card per registered sensor ───
+    infoLayout->addWidget(buildModeCard(infoPanel));
+
     for (Sensor *s : sensors)
         infoLayout->addWidget(buildSensorCard(s, infoPanel));
 
@@ -478,6 +583,25 @@ void AnacostiaIQ::pollWeather()
     dbWriter.sendWeatherData("precip_amount", "mm",  rainAmount);
     dbWriter.sendWeatherData("precip_prob",   "%",   rainProb);
     dbWriter.sendWeatherData("temperature",   "C",   temp);
+
+    // ── Re-evaluate the polling cadence ────────────────────
+    // The invariant: slow down only when we positively know it's dry.
+    // A failed fetch or a stale forecast leaves us at base intervals,
+    // because dropping the sampling rate exactly when we've lost
+    // visibility is the one outcome we can't accept.
+    if (!adaptiveEnabled)
+        return;
+
+    const RainPolicy::Decision decision =
+        RainPolicy::evaluate(rainProb, QDateTime::currentDateTime(),
+                             lookaheadHours, rainThreshold);
+
+    haveForecast = (decision != RainPolicy::Decision::NoDataInWindow);
+    if (!haveForecast)
+        qWarning() << "Adaptive polling: no usable precipitation forecast "
+                      "— staying at high frequency";
+
+    setLowFrequencyMode(decision == RainPolicy::Decision::Dry);
 }
 
 // ================================================================

@@ -31,6 +31,16 @@ public:
     double  barrelDepthCm() const       { return m_barrelDepth; }
     QString apiUrl() const              { return m_apiUrl; }
 
+    // ── Adaptive polling ───────────────────────────────────
+    // When no rain is forecast within rainLookaheadHours, every
+    // sensor's interval is multiplied by idleIntervalFactor. The
+    // weather interval is deliberately never scaled — it's what
+    // detects rain coming back.
+    bool    adaptiveEnabled() const        { return m_adaptiveEnabled; }
+    int     idleIntervalFactor() const     { return m_idleFactor; }
+    double  rainProbabilityThreshold() const { return m_rainThreshold; }
+    int     rainLookaheadHours() const     { return m_lookaheadHours; }
+
     // ── Weather settings ───────────────────────────────────
     // Weather is polled as a group on its own interval (defaults to
     // app.pollIntervalSeconds if "weather.intervalSeconds" is absent).
@@ -53,6 +63,12 @@ private:
     int     m_pollInterval = 3600;
     double  m_barrelDepth  = 137.16;
     QString m_apiUrl       = "http://54.213.147.59:5000/sensor";
+
+    // Adaptive polling
+    bool    m_adaptiveEnabled = true;
+    int     m_idleFactor      = 10;
+    double  m_rainThreshold   = 0.0;    // % — above this counts as "rain"
+    int     m_lookaheadHours  = 24;
 
     // Weather
     int     m_weatherInterval = 3600;   // falls back to m_pollInterval on load

@@ -5,6 +5,13 @@
     "barrelDepthCm": 137.16,
     "apiUrl": "http://54.213.147.59:5000/sensor"
   },
+  "adaptive": {
+    "_comment": "When no forecast point in the next 'lookaheadHours' exceeds 'rainProbabilityThreshold' percent, every sensor's intervalSeconds is multiplied by 'idleFactor' (low-frequency mode). Rain in the forecast restores the base intervals. The weather poll itself is never scaled — it's what notices rain returning. Set enabled=false to pin the base intervals, or idleFactor=1 for the same effect.",
+    "enabled": true,
+    "idleFactor": 10,
+    "rainProbabilityThreshold": 0,
+    "lookaheadHours": 24
+  },
   "weather": {
     "_comment": "source is 'openmeteo' or 'noaa'. Open-Meteo uses latitude/longitude and gives hourly values. NOAA uses noaaOffice + gridX/gridY (multi-hour bins). 'intervalSeconds' polls weather as a group; forecasts change slowly so a larger value is fine.",
     "intervalSeconds": 1800,
