@@ -1,27 +1,28 @@
 /////////////////////////////////////////////////////////////
-// MOISTURESENSOR.H - Soil moisture sensor (ADC0804 over GPIO)
+// MOISTURESENSOR.H - Soil moisture sensor (one ADC0804 channel)
 //
-//  8-bit parallel ADC (ADC0804) driven by bit-banged GPIO via
-//  libgpiod. NOT SPI. Pin assignments and calibration are passed
-//  in from config.json via the factory.
+//  A moisture probe is one channel on a shared AdcBus: an ADC0804
+//  whose byte is shifted out through a CD4014. The bus owns the
+//  GPIO lines (they're shared with the other converters); this class
+//  contributes only its data pin and its own dry/wet calibration.
+//
+//  Everything comes from config.json — the "adc" block describes the
+//  bus, each sensor entry names its dataPin, adcDry and adcWet.
 /////////////////////////////////////////////////////////////
+
 #ifndef MOISTURESENSOR_H
 #define MOISTURESENSOR_H
-#include "Sensor.h"
-#include <QString>
-#include <QVector>
-#include <QDebug>
 
-#ifdef RasPi
-#include <gpiod.hpp>
+#include "Sensor.h"
+#include "AdcBus.h"
+#include <QString>
+#include <QDebug>
 #include <memory>
-#endif
 
 class MoistureSensor : public Sensor {
 public:
     MoistureSensor(const QString &id, const QString &unit, const QString &name,
-                   const QString &chip, const QVector<int> &dataPins,
-                   int wrPin, int rdPin, int intrPin,
+                   std::shared_ptr<AdcBus> bus, int dataPin,
                    int adcDry, int adcWet);
     ~MoistureSensor() override;
 
@@ -29,24 +30,15 @@ public:
     double measure() override;
 
 private:
-    void   cleanup();
-    int    readChannel();                      // returns 0–255, or -1 on failure
     double rawToMoisturePercent(int raw) const;
 
-    QString       m_chip;
-    QVector<int>  m_dataPins;   // [DB0..DB7]
-    int           m_wrPin   = -1;
-    int           m_rdPin   = -1;
-    int           m_intrPin = -1;
-    int           m_adcDry  = 645;
-    int           m_adcWet  = 160;
+    std::shared_ptr<AdcBus> m_bus;
+    int m_dataPin = -1;   // this probe's CD4014 Q8 line
 
-#ifdef RasPi
-    std::unique_ptr<gpiod::chip>          m_chipObj;
-    std::unique_ptr<gpiod::line_request>  m_dataReq;
-    std::unique_ptr<gpiod::line_request>  m_wrReq;
-    std::unique_ptr<gpiod::line_request>  m_rdReq;
-    std::unique_ptr<gpiod::line_request>  m_intrReq;
-#endif
+    // Raw ADC counts (0-255) for a probe in dry air and in water.
+    // Dry reads higher than wet, so adcDry > adcWet.
+    int m_adcDry = 105;
+    int m_adcWet = 32;
 };
+
 #endif // MOISTURESENSOR_H

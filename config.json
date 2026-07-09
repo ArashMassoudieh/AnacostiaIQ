@@ -15,6 +15,16 @@
     "noaaGridX": 97,
     "noaaGridY": 71
   },
+  "adc": {
+    "_comment": "Shared ADC0804 + CD4014 bank. Every 'moisture' sensor is one channel on it: the three control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. conversionDelayMs is how long to wait after the WR pulse before shifting the byte out (no INTR line is wired, so it can't be sensed) — raise it if readings look unstable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
+    "chip": "/dev/gpiochip4",
+    "wrPin": 2,
+    "psPin": 3,
+    "clockPin": 4,
+    "conversionDelayMs": 50,
+    "pulseWidthUs": 500,
+    "cacheMs": 500
+  },
   "sensors": [
     {
       "type": "distance",
@@ -53,17 +63,14 @@
       }
     },
     {
+      "_comment": "One channel of the 'adc' bank. To add the other three converters, copy this entry with a unique id and dataPin 6, 13 or 19, and calibrate adcDry/adcWet per probe.",
       "id": "moisture_sensor",
       "type": "moisture",
       "unit": "%",
       "name": "Soil Moisture",
       "intervalSeconds": 60,
       "params": {
-        "chip": "/dev/gpiochip0",
-        "dataPins": [5, 6, 13, 19, 26, 16, 20, 21],
-        "wrPin": 23,
-        "rdPin": 24,
-        "intrPin": 25,
+        "dataPin": 5,
         "adcDry": 105,
         "adcWet": 32
       }

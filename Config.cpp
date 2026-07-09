@@ -6,6 +6,7 @@
 #include "DistanceSensor.h"
 #include "MoistureSensor.h"
 #include "MaxbotixSensor.h"
+#include "AdcBus.h"
 
 #include <QFile>
 #include <QJsonDocument>
@@ -13,6 +14,8 @@
 #include <QJsonArray>
 #include <QJsonParseError>
 #include <QDebug>
+
+#include <memory>
 
 bool Config::load(const QString &path)
 {
@@ -69,7 +72,43 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
     }
 
     QJsonDocument doc = QJsonDocument::fromJson(m_raw);
-    QJsonArray arr = doc.object().value("sensors").toArray();
+    QJsonObject root = doc.object();
+    QJsonArray arr = root.value("sensors").toArray();
+
+    // ── Shared ADC bus (built before any sensor) ───────────
+    // Every "moisture" entry is one channel of a single ADC0804 +
+    // CD4014 bank that shares its WR / P/S / CLOCK lines, so the bus
+    // has to know all its channels up front — libgpiod requests the
+    // data lines in one batch. Skipped entirely when no moisture
+    // sensor is configured, leaving those GPIOs free.
+    std::shared_ptr<AdcBus> adcBus;
+    QVector<int> moistureDataPins;
+    for (const QJsonValue &v : arr) {
+        const QJsonObject obj = v.toObject();
+        if (obj.value("type").toString() != "moisture")
+            continue;
+        if (obj.value("id").toString().isEmpty())
+            continue;   // the loop below skips it; don't claim its line
+        const int pin = obj.value("params").toObject()
+                            .value("dataPin").toInt(-1);
+        if (pin >= 0)
+            moistureDataPins.append(pin);
+    }
+
+    if (!moistureDataPins.isEmpty()) {
+        const QJsonObject adc = root.value("adc").toObject();
+        adcBus = std::make_shared<AdcBus>(
+            adc.value("chip").toString("/dev/gpiochip0"),
+            adc.value("wrPin").toInt(-1),
+            adc.value("psPin").toInt(-1),
+            adc.value("clockPin").toInt(-1),
+            adc.value("conversionDelayMs").toInt(50),
+            adc.value("pulseWidthUs").toInt(500),
+            adc.value("cacheMs").toInt(500));
+
+        for (int pin : moistureDataPins)
+            adcBus->addChannel(pin);
+    }
 
     for (const QJsonValue &v : arr) {
         QJsonObject obj = v.toObject();
@@ -100,21 +139,14 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
                                         totalLength, chip);
         }
         else if (type == "moisture") {
-            QString chip = params.value("chip").toString("/dev/gpiochip0");
+            // Pins/timing for the bus itself live in the "adc" block;
+            // a moisture entry only names its channel and calibration.
+            int dataPin = params.value("dataPin").toInt(-1);
+            int adcDry  = params.value("adcDry").toInt(105);
+            int adcWet  = params.value("adcWet").toInt(32);
 
-            QJsonArray dp = params.value("dataPins").toArray();
-            QVector<int> dataPins;
-            for (const QJsonValue &p : dp)
-                dataPins.append(p.toInt());
-
-            int wrPin   = params.value("wrPin").toInt(-1);
-            int rdPin   = params.value("rdPin").toInt(-1);
-            int intrPin = params.value("intrPin").toInt(-1);
-            int adcDry  = params.value("adcDry").toInt(645);
-            int adcWet  = params.value("adcWet").toInt(160);
-
-            sensor = new MoistureSensor(id, unit, name, chip, dataPins,
-                                        wrPin, rdPin, intrPin, adcDry, adcWet);
+            sensor = new MoistureSensor(id, unit, name, adcBus, dataPin,
+                                        adcDry, adcWet);
         }
         else if (type == "maxbotix") {
             QString device     = params.value("device").toString("/dev/ttyAMA0");

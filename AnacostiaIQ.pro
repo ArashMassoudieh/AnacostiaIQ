@@ -31,6 +31,7 @@ COPIES += config_copy
 SOURCES += \
     DatabaseWriter.cpp \
     Config.cpp \
+    AdcBus.cpp \
     DistanceSensor.cpp \
     MoistureSensor.cpp \
     MaxbotixSensor.cpp \
@@ -43,6 +44,7 @@ HEADERS += \
     DatabaseWriter.h \
     Config.h \
     Sensor.h \
+    AdcBus.h \
     DistanceSensor.h \
     MoistureSensor.h \
     MaxbotixSensor.h \
@@ -51,9 +53,9 @@ HEADERS += \
     anacostiaiq.h
 
 contains(DEFINES, RasPi) {
-    # libgpiod v2 C++ bindings: DistanceSensor (HC-SR04 trig/echo)
+    # libgpiod v2 C++ bindings: DistanceSensor (HC-SR04 trig/echo) and
+    # AdcBus (ADC0804 + CD4014 bit-banged read, shared by MoistureSensor)
     LIBS += -lgpiodcxx
-    # MoistureSensor uses Linux spidev (ioctl) — no library needed
     # MaxbotixSensor uses POSIX termios UART — no library needed
 }
 
