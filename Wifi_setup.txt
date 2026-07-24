@@ -1,0 +1,16 @@
+The wifi has the following parameters
+
+Network Access:   http://192.168.2.1
+
+Admin:            Sean Morgenstern (morgensterns@cua.edu)
+Admin access:     morgenstern
+Admin password:   Ch0senLily!!
+
+Celluar>Profile 1
+Provider:         hologram
+Password:     `   Aquinas3158!
+
+WLAN:             WPA2-PSK
+
+Network SSIM:     CUA-Digital-Twin-1
+Network Password: Ch0senLily!!
