@@ -61,53 +61,14 @@
       }
     },
     {
-      "_comment": "ADC #1 on the shared bank — CD4014 Q8 on GPIO5. adcDry/adcWet are this probe's raw counts in dry air and in water.",
+      "_comment": "The only populated channel on the 'adc' bank — ADC #1, CD4014 Q8 on GPIO5. adcDry/adcWet are this probe's raw counts in dry air and in water. The test rig wires three more converters (GPIO 6, 13 and 19); to bring one online, copy this entry with a unique id and its dataPin, and calibrate adcDry/adcWet for that probe. Unlisted channels are never requested from the kernel, so those GPIOs stay free.",
       "id": "moisture_sensor",
       "type": "moisture",
       "unit": "%",
-      "name": "Soil Moisture 1",
+      "name": "Soil Moisture",
       "intervalSeconds": 60,
       "params": {
         "dataPin": 5,
-        "adcDry": 105,
-        "adcWet": 32
-      }
-    },
-    {
-      "_comment": "ADC #2 — GPIO6. Calibration below is copied from probe 1 as a placeholder; calibrate it, or delete this entry if the channel has no probe on it.",
-      "id": "moisture_sensor_2",
-      "type": "moisture",
-      "unit": "%",
-      "name": "Soil Moisture 2",
-      "intervalSeconds": 60,
-      "params": {
-        "dataPin": 6,
-        "adcDry": 105,
-        "adcWet": 32
-      }
-    },
-    {
-      "_comment": "ADC #3 — GPIO13. Placeholder calibration; calibrate or delete.",
-      "id": "moisture_sensor_3",
-      "type": "moisture",
-      "unit": "%",
-      "name": "Soil Moisture 3",
-      "intervalSeconds": 60,
-      "params": {
-        "dataPin": 13,
-        "adcDry": 105,
-        "adcWet": 32
-      }
-    },
-    {
-      "_comment": "ADC #4 — GPIO19. Placeholder calibration; calibrate or delete.",
-      "id": "moisture_sensor_4",
-      "type": "moisture",
-      "unit": "%",
-      "name": "Soil Moisture 4",
-      "intervalSeconds": 60,
-      "params": {
-        "dataPin": 19,
         "adcDry": 105,
         "adcWet": 32
       }
