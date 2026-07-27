@@ -4,6 +4,8 @@
 //  The line-level sequence below mirrors the validated standalone
 //  program in Automated_Multi-ADC_sensing_1/main.cpp:
 //
+//    0. POWER HIGH           -> energise the bank (optional line; the
+//                               test program raises GPIO26 first)
 //    1. Pulse WR             -> every ADC starts converting
 //    2. Wait conversionDelay -> conversion settles (no INTR is wired;
 //                               the CD4014 sits between the ADC and
@@ -26,9 +28,11 @@
 #endif
 
 AdcBus::AdcBus(const QString &chip, int wrPin, int psPin, int clockPin,
-               int conversionDelayMs, int pulseWidthUs, int cacheMs)
+               int powerPin, int conversionDelayMs, int pulseWidthUs,
+               int cacheMs)
     : m_chip(chip),
       m_wrPin(wrPin), m_psPin(psPin), m_clockPin(clockPin),
+      m_powerPin(powerPin),
       m_conversionDelayMs(conversionDelayMs),
       m_pulseWidthUs(pulseWidthUs),
       m_cacheMs(cacheMs) {
@@ -78,11 +82,16 @@ bool AdcBus::initialize() {
         m_chipObj = std::make_unique<gpiod::chip>(m_chip.toStdString());
 
         // WR, P/S and CLOCK go out together: one request, one consumer.
+        // The supply-enable line joins them when configured — it's an
+        // output on the same chip, and one request keeps the ordering
+        // (power first) trivial.
         gpiod::line::offsets ctrlLines = {
             static_cast<unsigned int>(m_wrPin),
             static_cast<unsigned int>(m_psPin),
             static_cast<unsigned int>(m_clockPin)
         };
+        if (m_powerPin >= 0)
+            ctrlLines.push_back(static_cast<unsigned int>(m_powerPin));
 
         m_ctrlReq = std::make_unique<gpiod::line_request>(
             m_chipObj->prepare_request()
@@ -92,6 +101,12 @@ bool AdcBus::initialize() {
                     gpiod::line_settings()
                         .set_direction(gpiod::line::direction::OUTPUT))
                 .do_request());
+
+        // Power the bank before anything else touches it, and leave it
+        // on for the life of the bus.
+        if (m_powerPin >= 0)
+            m_ctrlReq->set_value(static_cast<unsigned int>(m_powerPin),
+                                 gpiod::line::value::ACTIVE);
 
         // Every channel's CD4014 Q8 output, requested in one batch so
         // the eight shift steps can sample them all per clock.
@@ -108,17 +123,21 @@ bool AdcBus::initialize() {
                         .set_direction(gpiod::line::direction::INPUT))
                 .do_request());
 
-        // Idle state: all three control lines low.
+        // Idle state: all three control lines low, with the same brief
+        // settle before CLOCK that the test program uses.
         m_ctrlReq->set_value(static_cast<unsigned int>(m_wrPin),
                              gpiod::line::value::INACTIVE);
         m_ctrlReq->set_value(static_cast<unsigned int>(m_psPin),
                              gpiod::line::value::INACTIVE);
+        std::this_thread::sleep_for(std::chrono::microseconds(1000));
         m_ctrlReq->set_value(static_cast<unsigned int>(m_clockPin),
                              gpiod::line::value::INACTIVE);
 
         qDebug() << "AdcBus: ready on" << m_chip
                  << "| WR" << m_wrPin << "P/S" << m_psPin
                  << "CLOCK" << m_clockPin
+                 << "POWER" << (m_powerPin >= 0 ? QString::number(m_powerPin)
+                                                : QString("none"))
                  << "| channels" << m_dataPins;
 
         m_available = true;

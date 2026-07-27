@@ -9,6 +9,11 @@
 //    WR      -> starts a conversion on every ADC at once
 //    P/S     -> HIGH latches each ADC's byte into its CD4014
 //    CLOCK   -> shifts every CD4014 one bit, together
+//    POWER   -> optional GPIO feeding the bank's supply rail; held
+//               HIGH for the life of the bus. The validated test
+//               program drives this (GPIO26) before touching any
+//               other line, so without it the converters read as
+//               unpowered garbage.
 //
 //  Each converter then reports on its own data line (the CD4014 Q8
 //  output), so one conversion + eight clocks yields one byte per
@@ -39,8 +44,11 @@
 
 class AdcBus {
 public:
+    // powerPin — supply-enable line, or -1 when the bank is powered
+    //            straight from the 5V rail and needs no GPIO.
     AdcBus(const QString &chip, int wrPin, int psPin, int clockPin,
-           int conversionDelayMs, int pulseWidthUs, int cacheMs);
+           int powerPin, int conversionDelayMs, int pulseWidthUs,
+           int cacheMs);
     ~AdcBus();
 
     // Register a channel. Must be called before initialize(), since
@@ -71,6 +79,7 @@ private:
     int m_wrPin;
     int m_psPin;
     int m_clockPin;
+    int m_powerPin;          // -1 = no GPIO-controlled supply
     int m_conversionDelayMs;
     int m_pulseWidthUs;
     int m_cacheMs;
@@ -87,7 +96,7 @@ private:
     void pulse(gpiod::line_request &req, unsigned int pin);
 
     std::unique_ptr<gpiod::chip>          m_chipObj;
-    std::unique_ptr<gpiod::line_request>  m_ctrlReq;   // WR, P/S, CLOCK
+    std::unique_ptr<gpiod::line_request>  m_ctrlReq;   // WR, P/S, CLOCK (+ POWER)
     std::unique_ptr<gpiod::line_request>  m_dataReq;   // every channel line
 #endif
 };

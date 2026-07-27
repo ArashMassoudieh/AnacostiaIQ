@@ -10,6 +10,11 @@
 #include "MoistureSensor.h"
 #include <cmath>
 
+#ifdef RasPi
+#include <thread>
+#include <chrono>
+#endif
+
 MoistureSensor::MoistureSensor(const QString &id, const QString &unit,
                                const QString &name,
                                std::shared_ptr<AdcBus> bus, int dataPin,

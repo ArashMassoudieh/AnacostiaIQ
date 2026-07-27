@@ -103,9 +103,12 @@ void MaxbotixSensor::cleanup() {
 
 double MaxbotixSensor::measure() {
 #ifdef RasPi
-    tcflush(m_fd, TCIFLUSH);
     if (m_fd < 0)
         return -1;
+
+    // Drop whatever accumulated between ticks: the sensor streams
+    // continuously, and a stale frame would report an old range.
+    tcflush(m_fd, TCIFLUSH);
 
     // Parse the streaming "Rxxxx" frames. Unlike the test program's
     // infinite loop, we read at most until a valid 4-digit frame is

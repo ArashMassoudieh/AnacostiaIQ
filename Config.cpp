@@ -123,6 +123,7 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
             adc.value("wrPin").toInt(-1),
             adc.value("psPin").toInt(-1),
             adc.value("clockPin").toInt(-1),
+            adc.value("powerPin").toInt(-1),   // optional supply-enable line
             adc.value("conversionDelayMs").toInt(50),
             adc.value("pulseWidthUs").toInt(500),
             adc.value("cacheMs").toInt(500));

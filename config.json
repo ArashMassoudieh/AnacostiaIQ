@@ -23,17 +23,19 @@
     "noaaGridY": 71
   },
   "adc": {
-    "_comment": "Shared ADC0804 + CD4014 bank. Every 'moisture' sensor is one channel on it: the three control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. conversionDelayMs is how long to wait after the WR pulse before shifting the byte out (no INTR line is wired, so it can't be sensed) — raise it if readings look unstable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
+    "_comment": "Shared ADC0804 + CD4014 bank, pinned to match the validated Automated_Multi-ADC_sensing_1 test. Every 'moisture' sensor is one channel on it: the control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. powerPin feeds the bank's supply rail and is held HIGH for the life of the app (set it to -1 if the bank is wired straight to 5V). conversionDelayMs is how long to wait after the WR pulse before shifting the byte out (no INTR line is wired, so it can't be sensed) — 1000 is what the test uses; lower it toward ~50 if you want a shorter blocking read and the values stay stable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
     "chip": "/dev/gpiochip4",
-    "wrPin": 2,
-    "psPin": 3,
-    "clockPin": 4,
-    "conversionDelayMs": 50,
+    "wrPin": 22,
+    "psPin": 4,
+    "clockPin": 27,
+    "powerPin": 26,
+    "conversionDelayMs": 1000,
     "pulseWidthUs": 500,
-    "cacheMs": 500
+    "cacheMs": 2000
   },
   "sensors": [
     {
+      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO15 (header pin 10), ECHO on GPIO18 (header pin 12). NOTE: GPIO15 is also UART0 RXD, which the MB7389-100 entry below needs. If both sensors are wired at once, move TRIG to a free line — GPIO17 and GPIO23/24 are unused in this pin map.",
       "type": "distance",
       "id": "hcsr04_depth",
       "unit": "in",
@@ -41,28 +43,17 @@
       "intervalSeconds": 5,
       "params": {
         "chip": "/dev/gpiochip0",
-        "trigPin": 17,
-        "echoPin": 27,
+        "trigPin": 15,
+        "echoPin": 18,
         "totalLength": 48
       }
     },
     {
-      "type": "distance",
-      "id": "MB7389_100_depth",
-      "unit": "in",
-      "name": "MB7389-100 Depth",
-      "intervalSeconds": 5,
-      "params": {
-        "chip": "/dev/gpiochip0",
-        "wireSerialPin": 15,
-        "totalLength": 48
-      }
-    },
-    {
+      "_comment": "MB7389-100, per MB7389-100_ultrasonic_sensor_2/main.cpp: it is read over UART, not over a bit-banged GPIO. Its pin-5 serial output goes to the Pi's UART0 RXD (GPIO15, header pin 10) and the app reads /dev/ttyAMA0 at 9600 8N1. There is no separate 'wireSerialPin' — the device path is the whole configuration. The id is kept as 'maxbotix_depth' so its history in the cloud DB stays continuous.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
-      "name": "Standpipe Depth",
+      "name": "MB7389-100 Depth",
       "intervalSeconds": 5,
       "params": {
         "device": "/dev/ttyAMA0",
@@ -70,14 +61,53 @@
       }
     },
     {
-      "_comment": "One channel of the 'adc' bank. To add the other three converters, copy this entry with a unique id and dataPin 6, 13 or 19, and calibrate adcDry/adcWet per probe.",
+      "_comment": "ADC #1 on the shared bank — CD4014 Q8 on GPIO5. adcDry/adcWet are this probe's raw counts in dry air and in water.",
       "id": "moisture_sensor",
       "type": "moisture",
       "unit": "%",
-      "name": "Soil Moisture",
+      "name": "Soil Moisture 1",
       "intervalSeconds": 60,
       "params": {
         "dataPin": 5,
+        "adcDry": 105,
+        "adcWet": 32
+      }
+    },
+    {
+      "_comment": "ADC #2 — GPIO6. Calibration below is copied from probe 1 as a placeholder; calibrate it, or delete this entry if the channel has no probe on it.",
+      "id": "moisture_sensor_2",
+      "type": "moisture",
+      "unit": "%",
+      "name": "Soil Moisture 2",
+      "intervalSeconds": 60,
+      "params": {
+        "dataPin": 6,
+        "adcDry": 105,
+        "adcWet": 32
+      }
+    },
+    {
+      "_comment": "ADC #3 — GPIO13. Placeholder calibration; calibrate or delete.",
+      "id": "moisture_sensor_3",
+      "type": "moisture",
+      "unit": "%",
+      "name": "Soil Moisture 3",
+      "intervalSeconds": 60,
+      "params": {
+        "dataPin": 13,
+        "adcDry": 105,
+        "adcWet": 32
+      }
+    },
+    {
+      "_comment": "ADC #4 — GPIO19. Placeholder calibration; calibrate or delete.",
+      "id": "moisture_sensor_4",
+      "type": "moisture",
+      "unit": "%",
+      "name": "Soil Moisture 4",
+      "intervalSeconds": 60,
+      "params": {
+        "dataPin": 19,
         "adcDry": 105,
         "adcWet": 32
       }
