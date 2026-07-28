@@ -9,7 +9,6 @@
 // P/S       -> GPIO4
 // CLOCK     -> GPIO27
 // WR        -> GPIO22
-// 5V line   -> GPIO26
 
 // Data Outputs:
 // ADC #1 Q8 -> GPIO 5
