@@ -38,10 +38,10 @@ using namespace std::chrono;
 // GPIO Definitions
 //============================================================
 
-constexpr unsigned WR_PIN    = 22;
-constexpr unsigned PS_PIN    = 4;
-constexpr unsigned CLOCK_PIN = 27;
-constexpr unsigned Voltage_PIN    = 26;
+constexpr unsigned WR_PIN    = 2;
+constexpr unsigned PS_PIN    = 27;
+constexpr unsigned CLOCK_PIN = 4;
+
 
 constexpr unsigned DATA1_PIN = 5;
 constexpr unsigned DATA2_PIN = 6;
