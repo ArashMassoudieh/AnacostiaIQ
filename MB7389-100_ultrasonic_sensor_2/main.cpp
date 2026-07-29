@@ -1,9 +1,3 @@
-//==================================================
-// Pin connections (Pi 5 to MB7389-100 Sensor)
-// 5V -> V+ (2 -> 6)
-// GND -> GND (6 -> 7)
-// GPIO 15 -> Wire serial pin (10 -> 5)
-//==================================================
 
 #include <iostream>
 #include <string>
@@ -18,6 +12,8 @@ using namespace std;
 // UNIT SELECTION
 //==================================================
 constexpr bool USE_IMPERIAL = true;
+double total_length = 48;           // 48 inches
+double distance_above_ground = 20;  // 20 inches
 
 //==================================================
 // PIPE DIMENSIONS
@@ -32,8 +28,6 @@ constexpr bool USE_IMPERIAL = true;
 // total_length = 1219.2;  // mm
 // distance_above_ground = 508;
 //==================================================
-double total_length = 48;
-double distance_above_ground = 20;
 
 double dist_underground =
     total_length - distance_above_ground;

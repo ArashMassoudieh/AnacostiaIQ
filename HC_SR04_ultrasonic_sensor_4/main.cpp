@@ -1,11 +1,3 @@
-//====================================
-// Pin connections (PIN NUMBERS: Pi 5 -> HC-SR04)
-// 5V -> VCC (2 -> 1)
-// GPIO 17 -> TRIG (11 -> 2)
-// GPIO 27 -> ECHO (13 -> 3)
-// GND -> GND (6 -> 4)
-//====================================
-
 #include <gpiod.hpp>
 #include <thread>
 #include <chrono>
@@ -22,12 +14,12 @@ using namespace std::chrono;
 //constexpr unsigned int TRIG_PIN = 23;
 //constexpr unsigned int ECHO_PIN = 24;
 
-constexpr unsigned int TRIG_PIN = 15;
+constexpr unsigned int TRIG_PIN = 14;
 constexpr unsigned int ECHO_PIN = 18;
 
 // Pipe dimensions in inches
-double total_length = 48;
-double distance_above_ground = 20;
+double total_length = 12;
+double distance_above_ground = 12;
 double dist_underground = total_length - distance_above_ground;
 
 // Speed of sound:
@@ -36,11 +28,11 @@ const double SOUND_SPEED_IN_PER_US = 0.0135;
 
 double gravity = 32.174;          // ft/s²
 double Cd = 0.611;                // Typical discharge coefficient
-double theta_deg = 30.0/2;
+double theta_deg = 60/2;
 double theta_rad = theta_deg * M_PI / 180.0;
 
 // Optional calibration correction (feet)
-double k = 0.0;
+double k = 3.25;
 
 // Wait for GPIO line state with timeout
 bool wait_for_state(gpiod::line_request& req,
@@ -145,11 +137,13 @@ int main()
             double depth = total_length - measured_distance;
 
             // Water head above notch (convert inches to feet)
-            double H = depth / 12.0;
+            double H=(depth-k)/12;
+            if (H<0){
+                H=0;}
 
-            double Flow_Rate =(8.0/15.0)*Cd*sqrt(2.0*gravity)*tan(theta_rad)*pow(H+k,2.5); // In Ft^3/sec
+            double Flow_Rate =(8.0/15.0)*Cd*sqrt(2.0*gravity)*tan(theta_rad)*pow(H,2.5); // In Ft^3/sec
 
-            double gps = Flow_Rate * 7.48052;// gallons/sec
+            double gps = Flow_Rate * 7.48052*60;// gallons/min
 
             cout << "Measured distance: "
                  << measured_distance
@@ -165,7 +159,7 @@ int main()
 
             cout << "Flow Rate: "
                  << gps
-                 << "Gallons/Sec" << endl;
+                 << " Gallons/Min" << endl;
 
 
             // Delay between measurements

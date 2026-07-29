@@ -6,10 +6,10 @@
 //
 // Four ADC0804/CD4014 circuits share:
 //
-// P/S       -> GPIO4
-// CLOCK     -> GPIO27
-// WR        -> GPIO22
-
+// WR      -> GPIO2
+// P/S     -> GPIO27
+// CLOCK   -> GPIO4
+//
 // Data Outputs:
 // ADC #1 Q8 -> GPIO 5
 // ADC #2 Q8 -> GPIO 6
@@ -25,9 +25,6 @@
 #include <thread>
 #include <chrono>
 
-#include <vector>
-#include <array>
-
 #include <cstdint>
 
 using namespace std;
@@ -41,7 +38,6 @@ constexpr unsigned WR_PIN    = 2;
 constexpr unsigned PS_PIN    = 27;
 constexpr unsigned CLOCK_PIN = 4;
 
-
 constexpr unsigned DATA1_PIN = 5;
 constexpr unsigned DATA2_PIN = 6;
 constexpr unsigned DATA3_PIN = 13;
@@ -51,34 +47,28 @@ constexpr unsigned DATA4_PIN = 19;
 // Pulse helper
 //============================================================
 
-void pulseLine(
-    gpiod::line_request& req,
-    unsigned pin)
+void pulseLine(gpiod::line_request& req,
+               unsigned pin,
+               int us = 50000)
 {
-    req.set_value(
-        pin,
-        gpiod::line::value::ACTIVE);
+    req.set_value(pin, gpiod::line::value::ACTIVE);
 
-    this_thread::sleep_for(
-        microseconds(500));
+    std::this_thread::sleep_for(
+        std::chrono::microseconds(us));
 
-    req.set_value(
-        pin,
-        gpiod::line::value::INACTIVE);
+    req.set_value(pin, gpiod::line::value::INACTIVE);
 
-    this_thread::sleep_for(
-        microseconds(500));
+    std::this_thread::sleep_for(
+        std::chrono::microseconds(us));
 }
-
 //============================================================
 // Main
 //============================================================
 
-int main(){
-
+int main()
+{
     try
     {
-
         //----------------------------------------------------
         // Open GPIO chip
         //----------------------------------------------------
@@ -96,21 +86,28 @@ int main(){
                     {
                         WR_PIN,
                         PS_PIN,
-                        CLOCK_PIN,
-                        Voltage_PIN
+                        CLOCK_PIN
                     },
                     gpiod::line_settings()
                         .set_direction(
                             gpiod::line::direction::OUTPUT))
                 .do_request();
 
-        outputs.set_value(
-            Voltage_PIN,
-            gpiod::line::value::ACTIVE);
+        outputs.set_values({
+            {WR_PIN,    gpiod::line::value::INACTIVE},
+            {PS_PIN,    gpiod::line::value::INACTIVE},
+            {CLOCK_PIN, gpiod::line::value::INACTIVE}
+        });
 
         //----------------------------------------------------
         // Input GPIOs
         //----------------------------------------------------
+
+        gpiod::line_settings input_settings;
+
+        input_settings
+            .set_direction(gpiod::line::direction::INPUT)
+            .set_bias(gpiod::line::bias::PULL_DOWN);
 
         auto inputs =
             chip.prepare_request()
@@ -122,10 +119,9 @@ int main(){
                         DATA3_PIN,
                         DATA4_PIN
                     },
-                    gpiod::line_settings()
-                        .set_direction(
-                            gpiod::line::direction::INPUT))
+                    input_settings)
                 .do_request();
+
 
         //----------------------------------------------------
         // Initialize outputs
@@ -138,7 +134,7 @@ int main(){
         outputs.set_value(
             PS_PIN,
             gpiod::line::value::INACTIVE);
-        this_thread::sleep_for(microseconds(1000));
+        this_thread::sleep_for(microseconds(50000));
 
         outputs.set_value(
             CLOCK_PIN,
@@ -149,7 +145,27 @@ int main(){
         cout << " Four ADC0804 Parallel Acquisition Ready" << endl;
         cout << "==========================================" << endl;
 
-        cout << "\nGPIO sanity check:" << endl;
+        cout << "\nGPIO idle states\n";
+
+        cout << "ADC1: "
+             << (inputs.get_value(DATA1_PIN) ==
+                 gpiod::line::value::ACTIVE)
+             << endl;
+
+        cout << "ADC2: "
+             << (inputs.get_value(DATA2_PIN) ==
+                 gpiod::line::value::ACTIVE)
+             << endl;
+
+        cout << "ADC3: "
+             << (inputs.get_value(DATA3_PIN) ==
+                 gpiod::line::value::ACTIVE)
+             << endl;
+
+        cout << "ADC4: "
+             << (inputs.get_value(DATA4_PIN) ==
+                 gpiod::line::value::ACTIVE)
+             << endl;
 
 
 
@@ -180,28 +196,56 @@ int main(){
             cout << endl;
             cout << "Starting conversion..." << endl;
 
-            pulseLine(outputs, WR_PIN);
+            //--------------------------------------------------
+            // Start ADC conversion
+            //--------------------------------------------------
 
-            this_thread::sleep_for(
-                milliseconds(1000));
 
-            //------------------------------------------------
-            // Load CD4014 registers
-            //------------------------------------------------
+            outputs.set_value(
+                WR_PIN,
+                gpiod::line::value::ACTIVE);
+
+            std::cout << "WR HIGH\n";
+
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(500));
+
+            outputs.set_value(
+                WR_PIN,
+                gpiod::line::value::INACTIVE);
+
+            std::cout << "WR LOW\n";
+
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(500));
+
+
+            //--------------------------------------------------
+            // Parallel load
+            //--------------------------------------------------
+
+            // Load ADC outputs into the CD4014
 
             outputs.set_value(
                 PS_PIN,
                 gpiod::line::value::ACTIVE);
 
+            std::this_thread::sleep_for(
+                std::chrono::microseconds(50000));
+
+            // Latch the parallel inputs
             pulseLine(outputs, CLOCK_PIN);
 
             outputs.set_value(
                 PS_PIN,
                 gpiod::line::value::INACTIVE);
 
-    //------------------------------------------------
-    // Shifting begins here...
-    //------------------------------------------------
+            std::this_thread::sleep_for(
+                std::chrono::microseconds(50000));
+
+            //------------------------------------------------
+            // Shifting begins here...
+            //------------------------------------------------
             //------------------------------------------------
             // Read all four ADCs simultaneously
             //------------------------------------------------
