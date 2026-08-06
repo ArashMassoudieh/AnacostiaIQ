@@ -520,7 +520,7 @@ void AnacostiaIQ::pollSensor(Sensor *s)
     if (!s->isAvailable())
         return;   // startup message already shown; leave the card as-is
 
-    const double value = s->measure();
+    const double value = s->takeReading();   // averages samplesPerReading samples
 
     if (!Sensor::isValid(value)) {
         // Available but no valid reading this tick.

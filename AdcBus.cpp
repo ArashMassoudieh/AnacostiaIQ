@@ -1,16 +1,18 @@
 /////////////////////////////////////////////////////////////
 // ADCBUS.CPP - Shared ADC0804 + CD4014 acquisition bus
 //
-//  The line-level sequence below mirrors the validated standalone
-//  program in Automated_Multi-ADC_sensing_1/main.cpp:
+//  The line-level sequence below mirrors All_inclusive_sensor_program/
+//  ADC.cpp — the standalone program that reads correctly on the Pi:
 //
 //    0. POWER HIGH           -> energise the bank (optional line; the
-//                               test program raises GPIO26 first)
-//    1. Pulse WR             -> every ADC starts converting
+//                               working rig feeds the bank from 5V and
+//                               leaves powerPin at -1)
+//    1. WR HIGH for wrHighUs, then LOW
+//                            -> every ADC starts converting
 //    2. Wait conversionDelay -> conversion settles (no INTR is wired;
 //                               the CD4014 sits between the ADC and
 //                               the Pi, so completion can't be sensed)
-//    3. P/S HIGH, pulse CLOCK, P/S LOW
+//    3. P/S HIGH, settle, pulse CLOCK, P/S LOW, settle
 //                            -> each CD4014 latches its ADC's byte
 //                               and switches to serial mode
 //    4. Eight times: sample every data line, then pulse CLOCK
@@ -28,13 +30,15 @@
 #endif
 
 AdcBus::AdcBus(const QString &chip, int wrPin, int psPin, int clockPin,
-               int powerPin, int conversionDelayMs, int pulseWidthUs,
-               int cacheMs)
+               int powerPin, int wrHighUs, int conversionDelayMs,
+               int pulseWidthUs, int settleUs, int cacheMs)
     : m_chip(chip),
       m_wrPin(wrPin), m_psPin(psPin), m_clockPin(clockPin),
       m_powerPin(powerPin),
+      m_wrHighUs(wrHighUs),
       m_conversionDelayMs(conversionDelayMs),
       m_pulseWidthUs(pulseWidthUs),
+      m_settleUs(settleUs),
       m_cacheMs(cacheMs) {
 }
 
@@ -114,22 +118,26 @@ bool AdcBus::initialize() {
         for (int pin : m_dataPins)
             dataLines.push_back(static_cast<unsigned int>(pin));
 
+        // PULL_DOWN matches the working program: the CD4014 drives Q8
+        // hard, but between a request and the first latch the line is
+        // undriven, and a floating input reads as noise.
         m_dataReq = std::make_unique<gpiod::line_request>(
             m_chipObj->prepare_request()
                 .set_consumer("anacostiaiq-adc-data")
                 .add_line_settings(
                     dataLines,
                     gpiod::line_settings()
-                        .set_direction(gpiod::line::direction::INPUT))
+                        .set_direction(gpiod::line::direction::INPUT)
+                        .set_bias(gpiod::line::bias::PULL_DOWN))
                 .do_request());
 
-        // Idle state: all three control lines low, with the same brief
-        // settle before CLOCK that the test program uses.
+        // Idle state: all three control lines low, with the same settle
+        // before CLOCK that the working program uses.
         m_ctrlReq->set_value(static_cast<unsigned int>(m_wrPin),
                              gpiod::line::value::INACTIVE);
         m_ctrlReq->set_value(static_cast<unsigned int>(m_psPin),
                              gpiod::line::value::INACTIVE);
-        std::this_thread::sleep_for(std::chrono::microseconds(1000));
+        std::this_thread::sleep_for(std::chrono::microseconds(m_settleUs));
         m_ctrlReq->set_value(static_cast<unsigned int>(m_clockPin),
                              gpiod::line::value::INACTIVE);
 
@@ -165,8 +173,10 @@ void AdcBus::cleanup() {
 }
 
 #ifdef RasPi
-// Drive a control line high for pulseWidthUs, then low for the same,
-// leaving it low. WR, P/S-load and CLOCK all use this shape.
+// Drive CLOCK high for pulseWidthUs, then low for the same, leaving
+// it low. Both the latch pulse and the eight shift pulses use it.
+// WR is not pulsed through here — it has its own, much longer high
+// time (wrHighUs) in the working program.
 void AdcBus::pulse(gpiod::line_request &req, unsigned int pin) {
     req.set_value(pin, gpiod::line::value::ACTIVE);
     std::this_thread::sleep_for(std::chrono::microseconds(m_pulseWidthUs));
@@ -186,14 +196,18 @@ bool AdcBus::convertAndShift() {
 
     try {
         // ── Start a conversion on every ADC ────────────────
-        pulse(*m_ctrlReq, wr);
+        m_ctrlReq->set_value(wr, gpiod::line::value::ACTIVE);
+        std::this_thread::sleep_for(std::chrono::microseconds(m_wrHighUs));
+        m_ctrlReq->set_value(wr, gpiod::line::value::INACTIVE);
         std::this_thread::sleep_for(
             std::chrono::milliseconds(m_conversionDelayMs));
 
         // ── Latch each byte into its CD4014, back to serial ─
         m_ctrlReq->set_value(ps, gpiod::line::value::ACTIVE);
+        std::this_thread::sleep_for(std::chrono::microseconds(m_settleUs));
         pulse(*m_ctrlReq, clock);
         m_ctrlReq->set_value(ps, gpiod::line::value::INACTIVE);
+        std::this_thread::sleep_for(std::chrono::microseconds(m_settleUs));
 
         // ── Shift all channels out together, MSB first ─────
         QHash<int, int> acc;

@@ -124,8 +124,12 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
             adc.value("psPin").toInt(-1),
             adc.value("clockPin").toInt(-1),
             adc.value("powerPin").toInt(-1),   // optional supply-enable line
-            adc.value("conversionDelayMs").toInt(50),
-            adc.value("pulseWidthUs").toInt(500),
+            // Timing defaults are the working program's values, so an
+            // "adc" block that only names pins still reads correctly.
+            adc.value("wrHighUs").toInt(500000),
+            adc.value("conversionDelayMs").toInt(500),
+            adc.value("pulseWidthUs").toInt(50000),
+            adc.value("settleUs").toInt(50000),
             adc.value("cacheMs").toInt(500));
 
         for (int pin : moistureDataPins)
@@ -144,6 +148,10 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
         // Per-sensor poll interval; falls back to the app-level default
         // when the entry omits "intervalSeconds".
         const int interval = obj.value("intervalSeconds").toInt(m_pollInterval);
+
+        // How many samples one reading averages. Absent means 1, i.e.
+        // the previous behaviour of reporting a single sample.
+        const int samples = obj.value("samplesPerReading").toInt(1);
 
         if (id.isEmpty() || type.isEmpty()) {
             qWarning() << "Config: skipping sensor with missing type/id";
@@ -184,12 +192,15 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
         if (parent && sensor)
             sensor->setParent(parent);
 
-        if (sensor)
+        if (sensor) {
             sensor->setPollIntervalSeconds(interval);
+            sensor->setSamplesPerReading(samples);
+        }
 
         result.append(sensor);
         qDebug() << "Config: created" << type << "sensor" << id
-                 << "| interval(s):" << interval;
+                 << "| interval(s):" << interval
+                 << "| samples/reading:" << samples;
     }
 
     return result;

@@ -10,10 +10,9 @@
 //    P/S     -> HIGH latches each ADC's byte into its CD4014
 //    CLOCK   -> shifts every CD4014 one bit, together
 //    POWER   -> optional GPIO feeding the bank's supply rail; held
-//               HIGH for the life of the bus. The validated test
-//               program drives this (GPIO26) before touching any
-//               other line, so without it the converters read as
-//               unpowered garbage.
+//               HIGH for the life of the bus. Neither working test
+//               program uses one — on the current rig the bank is
+//               fed from the 5V rail and powerPin is -1.
 //
 //  Each converter then reports on its own data line (the CD4014 Q8
 //  output), so one conversion + eight clocks yields one byte per
@@ -47,8 +46,8 @@ public:
     // powerPin — supply-enable line, or -1 when the bank is powered
     //            straight from the 5V rail and needs no GPIO.
     AdcBus(const QString &chip, int wrPin, int psPin, int clockPin,
-           int powerPin, int conversionDelayMs, int pulseWidthUs,
-           int cacheMs);
+           int powerPin, int wrHighUs, int conversionDelayMs,
+           int pulseWidthUs, int settleUs, int cacheMs);
     ~AdcBus();
 
     // Register a channel. Must be called before initialize(), since
@@ -80,8 +79,10 @@ private:
     int m_psPin;
     int m_clockPin;
     int m_powerPin;          // -1 = no GPIO-controlled supply
-    int m_conversionDelayMs;
-    int m_pulseWidthUs;
+    int m_wrHighUs;          // WR held high to trigger a conversion
+    int m_conversionDelayMs; // WR low -> byte ready
+    int m_pulseWidthUs;      // CLOCK high/low half-period
+    int m_settleUs;          // settle either side of the P/S load
     int m_cacheMs;
 
     QVector<int>    m_dataPins;    // channel data lines, registration order

@@ -1,5 +1,5 @@
 {
-  "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets. Each sensor (and weather) may set its own 'intervalSeconds'; omit it to use app.pollIntervalSeconds.",
+  "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets. Each sensor (and weather) may set its own 'intervalSeconds'; omit it to use app.pollIntervalSeconds. Each sensor may also set 'samplesPerReading': one reported reading is then the mean of that many samples taken back to back (failed samples are dropped, and 60 ms separates consecutive ones). Omit it for 1, i.e. no averaging. Raising it lengthens the blocking read proportionally, so keep intervalSeconds well above samplesPerReading x the time one sample takes.",
   "app": {
     "pollIntervalSeconds": 10,
     "barrelDepthCm": 137.16,
@@ -23,14 +23,16 @@
     "noaaGridY": 71
   },
   "adc": {
-    "_comment": "Shared ADC0804 + CD4014 bank, pinned to match the validated Automated_Multi-ADC_sensing_1 test. Every 'moisture' sensor is one channel on it: the control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. powerPin feeds the bank's supply rail and is held HIGH for the life of the app (set it to -1 if the bank is wired straight to 5V). conversionDelayMs is how long to wait after the WR pulse before shifting the byte out (no INTR line is wired, so it can't be sensed) — 1000 is what the test uses; lower it toward ~50 if you want a shorter blocking read and the values stay stable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
-    "chip": "/dev/gpiochip4",
-    "wrPin": 22,
-    "psPin": 4,
-    "clockPin": 27,
-    "powerPin": 26,
-    "conversionDelayMs": 1000,
-    "pulseWidthUs": 500,
+    "_comment": "Shared ADC0804 + CD4014 bank, pinned to match All_inclusive_sensor_program/ADC.cpp — the version that currently reads correctly on the Pi. Every 'moisture' sensor is one channel on it: the control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. NOTE on 'chip': the older Automated_Multi-ADC_sensing_1 test used /dev/gpiochip4, but the Pi 5 kernel renumbered the RP1 bank to /dev/gpiochip0 — if you see 'AdcBus: GPIO init failed' in the log, check this first with 'gpiodetect'. powerPin is -1 because neither working program drives a supply-enable line; the bank is fed from the 5V rail. wrHighUs is how long WR is held high to trigger a conversion and conversionDelayMs how long to wait after it drops before shifting the byte out (no INTR line is wired, so completion can't be sensed). pulseWidthUs/settleUs are the clock pulse width and the settle either side of the P/S load. These four values reproduce the working program's timing exactly; shrink them only if the readings stay stable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
+    "chip": "/dev/gpiochip0",
+    "wrPin": 2,
+    "psPin": 27,
+    "clockPin": 4,
+    "powerPin": -1,
+    "wrHighUs": 500000,
+    "conversionDelayMs": 500,
+    "pulseWidthUs": 50000,
+    "settleUs": 50000,
     "cacheMs": 2000
   },
   "sensors": [
@@ -41,6 +43,7 @@
       "unit": "in",
       "name": "HC-SR04 Depth",
       "intervalSeconds": 5,
+      "samplesPerReading": 10,
       "params": {
         "chip": "/dev/gpiochip0",
         "trigPin": 15,
@@ -55,6 +58,7 @@
       "unit": "in",
       "name": "MB7389-100 Depth",
       "intervalSeconds": 5,
+      "samplesPerReading": 10,
       "params": {
         "device": "/dev/ttyAMA0",
         "totalLength": 48
@@ -67,6 +71,7 @@
       "unit": "%",
       "name": "Soil Moisture",
       "intervalSeconds": 60,
+      "samplesPerReading": 1,
       "params": {
         "dataPin": 5,
         "adcDry": 105,
