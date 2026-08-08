@@ -24,14 +24,13 @@
       "floor_at_zero": false
     },
     {
-      "_comment": "The MB7389-100 in the standpipe. The Pi publishes it under the id 'maxbotix_depth' (see the note in the root config.json — the id predates the hardware swap and was kept so its history stays continuous), so that is the id to list here, not 'MB7389_100_depth'. Hidden because the device is not currently reporting: GET /sensors returns no such id, which matches the GPIO15/UART0 conflict documented on the Pi side — the HC-SR04's TRIG line and this sensor's serial input want the same pin. Flip visible back to true once the two are on separate lines and readings appear.",
+      "_comment": "The MaxBotix (MB7389-100) in the standpipe, read over UART. The Pi publishes it as 'maxbotix_depth' — that is the only id for it, and the old 'MB7389_100_depth' entry is gone: the root config once carried both and a later commit consolidated them into this one. Kept visible because the sensor is part of the installation, but note it returns no data yet (GET /sensors does not list it), which matches the GPIO15/UART0 contention documented on the Pi side — the HC-SR04's TRIG line and this sensor's serial input want the same pin. Until that is resolved this charts empty.",
       "id": "maxbotix_depth",
       "name": "Standpipe Depth",
       "unit": "in",
       "color": "#26a69a",
       "area_color": "#2826a69a",
-      "floor_at_zero": false,
-      "visible": false
+      "floor_at_zero": false
     },
     {
       "id": "moisture_sensor",
