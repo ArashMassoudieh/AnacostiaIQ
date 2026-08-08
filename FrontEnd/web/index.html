@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<!--
+  AnacostiaIQ — public landing page.
+
+  Served at the docroot root; the WebAssembly dashboard lives at
+  /SensorDashboard.html and is reached from the button below. Kept as a
+  single self-contained file on purpose: the Apache vhost sets
+  Cross-Origin-Embedder-Policy: require-corp, which blocks cross-origin
+  subresources, so there are no CDN fonts, stylesheets, or images here.
+
+  Deployed by deploy_dashboard.sh from FrontEnd/web/. Edit this file,
+  not the copy on the server.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AnacostiaIQ — Bioretention Monitoring, John McCormack Rd NE</title>
+<meta name="description" content="Continuous sensor monitoring of a bioretention stormwater system on John McCormack Rd NE, Washington DC.">
+<style>
+  :root {
+    --bg: #f7f9fa;
+    --surface: #ffffff;
+    --border: #e2e8ea;
+    --text: #17242b;
+    --muted: #5a6b74;
+    --accent: #14807a;
+    --accent-ink: #ffffff;
+    --shadow: 0 1px 2px rgba(23,36,43,.06), 0 8px 24px rgba(23,36,43,.06);
+
+    --c-depth: #26a69a;
+    --c-depth2: #26c6da;
+    --c-moist: #8d6e63;
+    --c-temp: #ef5350;
+    --c-precip: #42a5f5;
+    --c-prob: #ab47bc;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1518;
+      --surface: #151f24;
+      --border: #24333a;
+      --text: #e8eef0;
+      --muted: #9aacb5;
+      --accent: #2dd4bf;
+      --accent-ink: #06211f;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  header { padding: 72px 0 8px; }
+
+  .eyebrow {
+    font-size: 13px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    line-height: 1.12;
+    letter-spacing: -.02em;
+    margin: 0 0 6px;
+    font-weight: 700;
+  }
+
+  .site {
+    font-size: 1.05rem;
+    color: var(--muted);
+    margin: 0 0 28px;
+  }
+
+  .lede {
+    font-size: 1.15rem;
+    color: var(--text);
+    margin: 0 0 32px;
+    max-width: 62ch;
+  }
+
+  /* ── Call to action ─────────────────────────────────────── */
+  .cta { margin: 0 0 12px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.02rem;
+    padding: 14px 26px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .btn svg { flex: none; }
+
+  .cta-note {
+    font-size: .9rem;
+    color: var(--muted);
+    margin: 12px 0 0;
+  }
+
+  /* ── Sections ───────────────────────────────────────────── */
+  section { padding: 48px 0 0; }
+
+  h2 {
+    font-size: 1.35rem;
+    letter-spacing: -.01em;
+    margin: 0 0 14px;
+    font-weight: 650;
+  }
+
+  p { margin: 0 0 16px; max-width: 68ch; }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 52px 0 0;
+  }
+
+  /* ── Measurement cards ──────────────────────────────────── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin: 22px 0 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--dot, var(--accent));
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+
+  .card h3 {
+    font-size: 1rem;
+    margin: 0 0 4px;
+    font-weight: 650;
+  }
+
+  .card .unit {
+    font-size: .82rem;
+    color: var(--muted);
+    font-weight: 500;
+    margin-left: 6px;
+  }
+
+  .card p {
+    margin: 0;
+    font-size: .92rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── Pipeline diagram ───────────────────────────────────── */
+  figure { margin: 24px 0 28px; }
+
+  /* Below ~560px the diagram's labels shrink past legibility, so let it
+     scroll sideways at a readable size instead of scaling down. */
+  .diagram-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .diagram {
+    width: 100%;
+    min-width: 560px;
+    height: auto;
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  figcaption {
+    font-size: .88rem;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+
+  .diagram .box { fill: var(--surface); stroke: var(--border); }
+  .diagram .label { fill: var(--text); font-size: 13px; font-weight: 600; }
+  .diagram .sub { fill: var(--muted); font-size: 11px; }
+  .diagram .flow { stroke: var(--accent); fill: none; }
+  .diagram .arrowhead { fill: var(--accent); }
+  .diagram .planned { fill: none; }
+  .diagram .planned-ink { fill: var(--muted); }
+  .diagram .planned-line { opacity: .6; }
+
+  /* ── Status callout ─────────────────────────────────────── */
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 22px 0 0;
+    font-size: .95rem;
+    color: var(--muted);
+    max-width: 68ch;
+  }
+  .callout strong { color: var(--text); font-weight: 650; }
+
+  /* ── Reference ──────────────────────────────────────────── */
+  .reference {
+    font-size: .9rem;
+    color: var(--muted);
+    margin: 22px 0 0;
+    padding-left: 16px;
+    border-left: 2px solid var(--border);
+    max-width: 68ch;
+    line-height: 1.55;
+  }
+  .reference .title { color: var(--text); font-style: italic; }
+
+  /* ── Team / contact ─────────────────────────────────────── */
+  .affiliation {
+    color: var(--muted);
+    margin: -6px 0 20px;
+    line-height: 1.5;
+  }
+
+  .affiliation .lab {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .team {
+    list-style: none;
+    margin: 0 0 22px;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 10px 24px;
+    max-width: 640px;
+  }
+
+  .team li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .team .name { font-weight: 600; }
+
+  .badge {
+    font-size: .7rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+  }
+
+  .contact-line { color: var(--muted); }
+  .contact-line a { color: var(--accent); }
+
+  /* ── Footer ─────────────────────────────────────────────── */
+  footer {
+    padding: 36px 0 64px;
+    color: var(--muted);
+    font-size: .88rem;
+  }
+  footer p { margin: 0 0 8px; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">AnacostiaIQ</p>
+    <h1>Monitoring a bioretention stormwater system</h1>
+    <p class="site">John McCormack Rd NE &middot; Washington, DC</p>
+
+    <p class="lede">
+      A continuously instrumented green stormwater installation. Water level,
+      soil moisture, and local weather are sampled on site, streamed to the
+      cloud, and plotted here so the system's response to individual storms
+      can be watched as it happens.
+    </p>
+
+    <p class="cta">
+      <a class="btn" href="SensorDashboard.html">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <path d="M2 15.2h14M3.4 12.4V8.1M7.1 12.4V4.4M10.8 12.4V6.6M14.5 12.4V2.6"
+                stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" fill="none"/>
+        </svg>
+        View live sensor data
+      </a>
+    </p>
+    <p class="cta-note">
+      The dashboard is a WebAssembly application that runs entirely in your
+      browser &mdash; the first load takes a few seconds while it downloads.
+    </p>
+  </header>
+
+  <hr>
+
+  <section>
+    <h2>The site</h2>
+    <p>
+      Bioretention cells are shallow, planted depressions that intercept
+      street and roof runoff, hold it briefly, and let it infiltrate through
+      an engineered soil profile instead of discharging straight to the storm
+      sewer. Their performance is difficult to judge from a design document:
+      what matters is how quickly a particular cell ponds during a real storm,
+      how far the water rises, and how long it takes to drain afterwards.
+    </p>
+    <p>
+      This deployment answers those questions by measurement rather than
+      inference. Sensors in the cell and in its standpipe record the water
+      surface continuously, a probe in the soil records moisture, and the
+      hourly forecast for the site is logged alongside them so every response
+      can be read against the rainfall that caused it.
+    </p>
+  </section>
+
+  <section>
+    <h2>What is measured</h2>
+    <div class="cards">
+
+      <div class="card" style="--dot: var(--c-depth2)">
+        <h3>Ponding depth<span class="unit">in</span></h3>
+        <p>Ultrasonic ranging above the cell surface, sampled every few
+           seconds and reported as the average of ten consecutive samples.</p>
+      </div>
+
+      <div class="card" style="--dot: var(--c-depth)">
+        <h3>Standpipe depth<span class="unit">in</span></h3>
+        <p>A second ultrasonic rangefinder reading the observation well,
+           giving the water level within the media rather than above it.</p>
+      </div>
+
+      <div class="card" style="--dot: var(--c-moist)">
+        <h3>Soil moisture<span class="unit">%</span></h3>
+        <p>A buried probe read once a minute through an analog-to-digital
+           converter and scaled against dry-air and submerged calibration
+           points.</p>
+      </div>
+
+      <div class="card" style="--dot: var(--c-temp)">
+        <h3>Air temperature<span class="unit">&deg;C</span></h3>
+        <p>Hourly forecast for the site, logged as a time series so it can be
+           read against the sensor record.</p>
+      </div>
+
+      <div class="card" style="--dot: var(--c-precip)">
+        <h3>Precipitation<span class="unit">mm</span></h3>
+        <p>Forecast rainfall depth by hour &mdash; the driver every other
+           series is interpreted against.</p>
+      </div>
+
+      <div class="card" style="--dot: var(--c-prob)">
+        <h3>Precipitation probability<span class="unit">%</span></h3>
+        <p>Also the control signal: it decides when the field station switches
+           between its two sampling rates.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>How the data gets here</h2>
+
+    <figure>
+      <div class="diagram-scroll">
+      <svg class="diagram" viewBox="0 0 720 232" role="img"
+           aria-label="Data path: field station at the site, to cloud service, to this browser. A planned digital twin also draws on the stored observations.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path class="arrowhead" d="M0 0 L10 5 L0 10 z"/>
+          </marker>
+        </defs>
+
+        <rect class="box" x="14"  y="30" width="196" height="70" rx="8" stroke-width="1.5"/>
+        <text class="label" x="112" y="58"  text-anchor="middle">Field station</text>
+        <text class="sub"   x="112" y="76"  text-anchor="middle">Raspberry Pi, on site</text>
+        <text class="sub"   x="112" y="91"  text-anchor="middle">reads sensors &amp; forecast</text>
+
+        <rect class="box" x="262" y="30" width="196" height="70" rx="8" stroke-width="1.5"/>
+        <text class="label" x="360" y="58"  text-anchor="middle">Cloud service</text>
+        <text class="sub"   x="360" y="76"  text-anchor="middle">HTTP API on AWS</text>
+        <text class="sub"   x="360" y="91"  text-anchor="middle">stores every reading</text>
+
+        <rect class="box" x="510" y="30" width="196" height="70" rx="8" stroke-width="1.5"/>
+        <text class="label" x="608" y="58"  text-anchor="middle">This dashboard</text>
+        <text class="sub"   x="608" y="76"  text-anchor="middle">runs in your browser</text>
+        <text class="sub"   x="608" y="91"  text-anchor="middle">queries a date range</text>
+
+        <path class="flow" d="M216 65 H252" stroke-width="1.8" marker-end="url(#ah)"/>
+        <path class="flow" d="M464 65 H500" stroke-width="1.8" marker-end="url(#ah)"/>
+
+        <text class="sub" x="234" y="52" text-anchor="middle">post</text>
+        <text class="sub" x="482" y="52" text-anchor="middle">fetch</text>
+
+        <!-- Planned stage, drawn dashed so it reads as not-yet-built. -->
+        <rect class="box planned" x="262" y="146" width="196" height="70" rx="8"
+              stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text class="label planned-ink" x="360" y="174" text-anchor="middle">Digital twin</text>
+        <text class="sub" x="360" y="192" text-anchor="middle">OpenHydroTwin</text>
+        <text class="sub" x="360" y="207" text-anchor="middle">not yet connected here</text>
+
+        <path class="flow planned-line" d="M360 104 V142" stroke-width="1.8"
+              stroke-dasharray="5 4" marker-end="url(#ah)"/>
+        <text class="sub" x="378" y="128" text-anchor="start">assimilate</text>
+      </svg>
+      </div>
+      <figcaption>
+        Readings move one way, from the cell to the browser. Nothing on this
+        page controls anything at the site. The dashed stage is planned, not
+        running.
+      </figcaption>
+    </figure>
+
+    <p>
+      A small computer in a weatherproof enclosure at the site polls each
+      sensor on its own schedule, averages away single-sample noise, and posts
+      every reading to a service running on AWS. It also pulls the hourly
+      forecast for the site's coordinates and logs temperature, rainfall, and
+      rain probability as time series of their own. The dashboard you reach
+      from the button above asks that service for a date range and draws the
+      result &mdash; it never talks to the field hardware directly.
+    </p>
+  </section>
+
+  <section>
+    <h2>Sampling that follows the weather</h2>
+    <p>
+      Most of the year a bioretention cell is doing nothing worth recording at
+      a high rate, and the interesting behaviour is compressed into a few
+      hours around each storm. The field station therefore watches the
+      forecast: when no hour in the next day carries a meaningful chance of
+      rain, it stretches every sensor interval by a factor of ten and idles.
+      When rain reappears in the forecast, the base intervals are restored
+      before the storm arrives.
+    </p>
+    <p>
+      The forecast poll itself is never slowed down, because it is the thing
+      that notices rain returning. The station also distinguishes a confidently
+      dry forecast from a missing one, and only idles on the former &mdash; a
+      failed weather lookup keeps it sampling at full rate rather than sleeping
+      through an event.
+    </p>
+  </section>
+
+  <section>
+    <h2>Part of a digital twin</h2>
+    <p>
+      Measurement is the first half of a larger effort. A bioretention cell is
+      normally credited with the runoff reduction its design calls for, and
+      checked afterwards by periodic visual inspection. Whether a particular
+      cell is still infiltrating what it was sized for &mdash; or has quietly
+      lost capacity as its media compacts, its planting changes, or sediment
+      accumulates &mdash; is rarely known with any confidence. Direct
+      flow monitoring would settle it, but retrofitting a weir or a calibrated
+      outlet to assets that were never designed for it does not scale beyond a
+      handful of research sites.
+    </p>
+    <p>
+      The alternative is to pair cheap, retrofittable sensors like the ones
+      here with a process-based model of the cell, and keep the two in step. In
+      that arrangement, called a digital twin, a simulation of the cell runs
+      continuously: one loop advances it in real time on incoming weather to
+      produce a current picture and a short forecast, while a second, slower
+      loop reads the accumulating sensor record and adjusts the model's
+      physical parameters &mdash; saturated hydraulic conductivity, storage
+      capacity, outlet behaviour &mdash; so the model keeps explaining the
+      data.
+    </p>
+    <p>
+      Because those parameters are physical properties rather than the internal
+      weights of a statistical predictor, watching them drift is itself the
+      measurement of interest: a conductivity estimate that falls steadily
+      across a season is what clogging looks like from the outside. Recent
+      observations are weighted more heavily than old ones, so the estimates
+      track the cell as it actually changes instead of averaging its whole
+      history together.
+    </p>
+
+    <p class="callout">
+      <strong>Status.</strong> What this site publishes today is the
+      data-collection layer: the sensors, the field station, and the record
+      behind the charts. The assimilation loop is not yet connected to this
+      installation. The framework it will use, OpenHydroTwin, is described in
+      the preprint below, where it is demonstrated on a synthetic bioretention
+      case rather than on field data from this site.
+    </p>
+
+    <p class="reference">
+      Shakouri, B., Kiriazes, R., Massoudieh, A.
+      <span class="title">OpenHydroTwin: A Generic Digital Twin Framework for
+      Stormwater Infrastructure.</span>
+      Preprint submitted to <em>Environmental Modelling &amp; Software</em>,
+      2026. Built on the open-source OpenHydroQual simulation engine.
+    </p>
+  </section>
+
+  <section>
+    <h2>Project team</h2>
+    <p class="affiliation">
+      <span class="lab">EnviroAI Lab</span> &ndash; Environmental AI and
+      Modeling Laboratory<br>
+      The Catholic University of America
+    </p>
+
+    <ul class="team">
+      <li>
+        <span class="name">Rebecca Kiriazes</span>
+        <span class="badge">Contact</span>
+      </li>
+      <li><span class="name">Arash Massoudieh</span></li>
+      <li><span class="name">Sean Morgenstern</span></li>
+      <li><span class="name">Behzad Shakouri</span></li>
+    </ul>
+
+    <p class="contact-line">
+      Questions about the installation or the data: Rebecca Kiriazes,
+      <a href="mailto:kiriazes@cua.edu">kiriazes@cua.edu</a>
+      &middot;
+      <a href="tel:+12023195671">202-319-5671</a>
+    </p>
+  </section>
+
+  <hr>
+
+  <footer>
+    <p>
+      Research deployment. Readings are published as recorded, without
+      quality-control screening, and may contain gaps or artifacts from sensor
+      or network faults. They are not a substitute for a regulatory monitoring
+      record.
+    </p>
+    <p><a href="SensorDashboard.html">Open the dashboard &rarr;</a></p>
+  </footer>
+
+</div>
+
+</body>
+</html>
