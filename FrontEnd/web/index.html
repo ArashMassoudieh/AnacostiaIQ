@@ -100,7 +100,13 @@
   }
 
   /* ── Call to action ─────────────────────────────────────── */
-  .cta { margin: 0 0 12px; }
+  .cta {
+    margin: 0 0 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
 
   .btn {
     display: inline-flex;
@@ -120,6 +126,17 @@
   .btn:active { transform: translateY(0); }
   .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   .btn svg { flex: none; }
+
+  /* Secondary action — same geometry as .btn, outlined rather than filled, so
+     the sensor dashboard stays the primary call to action. */
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    box-shadow: none;
+    border: 1.5px solid var(--accent);
+    padding: 12.5px 24.5px;   /* keeps the outer box level with .btn */
+  }
+  .btn-secondary:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
   .cta-note {
     font-size: .9rem;
@@ -325,10 +342,25 @@
         </svg>
         View live sensor data
       </a>
+
+      <a class="btn btn-secondary"
+         href="http://openhydrotwin.com/JM_Bioretention_forecast/">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <!-- forecast curve rising past a horizon line -->
+          <path d="M2 12.6C4.2 12.6 4.6 5.6 7.2 5.6c2.2 0 2.4 4.6 4.3 4.6 1.7 0 2-3.8 3.5-3.8"
+                stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M2 15.6h14" stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" stroke-dasharray="3 3" fill="none"/>
+        </svg>
+        View the 7-day forecast
+      </a>
     </p>
     <p class="cta-note">
-      The dashboard is a WebAssembly application that runs entirely in your
-      browser &mdash; the first load takes a few seconds while it downloads.
+      Both are WebAssembly applications that run entirely in your browser
+      &mdash; the first load takes a few seconds while they download. The
+      forecast is produced by a digital twin of the cell that pulls the
+      current weather forecast for the site and re-runs the model each day.
     </p>
   </header>
 
@@ -432,12 +464,15 @@
         <text class="sub" x="234" y="52" text-anchor="middle">post</text>
         <text class="sub" x="482" y="52" text-anchor="middle">fetch</text>
 
-        <!-- Planned stage, drawn dashed so it reads as not-yet-built. -->
-        <rect class="box planned" x="262" y="146" width="196" height="70" rx="8"
-              stroke-width="1.5" stroke-dasharray="5 4"/>
-        <text class="label planned-ink" x="360" y="174" text-anchor="middle">Digital twin</text>
-        <text class="sub" x="360" y="192" text-anchor="middle">OpenHydroTwin</text>
-        <text class="sub" x="360" y="207" text-anchor="middle">not yet connected here</text>
+        <!-- Digital twin: running on live weather. The dashed link is the
+             assimilation of site readings, which is not connected yet. -->
+        <a href="http://openhydrotwin.com/JM_Bioretention_forecast/">
+          <rect class="box" x="262" y="146" width="196" height="70" rx="8"
+                stroke-width="1.5"/>
+          <text class="label" x="360" y="174" text-anchor="middle">Digital twin</text>
+          <text class="sub" x="360" y="192" text-anchor="middle">OpenHydroTwin</text>
+          <text class="sub" x="360" y="207" text-anchor="middle">7-day forecast, daily</text>
+        </a>
 
         <path class="flow planned-line" d="M360 104 V142" stroke-width="1.8"
               stroke-dasharray="5 4" marker-end="url(#ah)"/>
@@ -446,8 +481,9 @@
       </div>
       <figcaption>
         Readings move one way, from the cell to the browser. Nothing on this
-        page controls anything at the site. The dashed stage is planned, not
-        running.
+        page controls anything at the site. The twin runs on the weather
+        forecast today; the dashed link, feeding site readings back into it,
+        is planned.
       </figcaption>
     </figure>
 
@@ -517,12 +553,16 @@
     </p>
 
     <p class="callout">
-      <strong>Status.</strong> What this site publishes today is the
-      data-collection layer: the sensors, the field station, and the record
-      behind the charts. The assimilation loop is not yet connected to this
-      installation. The framework it will use, OpenHydroTwin, is described in
-      the preprint below, where it is demonstrated on a synthetic bioretention
-      case rather than on field data from this site.
+      <strong>Status.</strong> Two things are running here. The
+      data-collection layer &mdash; the sensors, the field station, and the
+      record behind the charts &mdash; and a digital twin of the cell, which
+      pulls the weather forecast for the site each day and simulates the
+      coming week; that is what the forecast button above opens. The two are
+      not yet joined: the twin runs on forecast weather alone, and the
+      assimilation loop that would correct it against these sensor readings
+      is still to be connected. The framework, OpenHydroTwin, is described in
+      the preprint below, where assimilation is demonstrated on a synthetic
+      bioretention case rather than on field data from this site.
     </p>
 
     <p class="reference">

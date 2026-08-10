@@ -66,3 +66,15 @@ FrontEnd/build/WebAssembly_Qt_6_8_2_single_threaded-Release/.qtc_clangd/
 FrontEnd/build/WebAssembly_Qt_6_8_2_single_threaded-Release/
 
 build/Desktop_Qt_6_8_3-Debug/
+
+FrontEnd/build/Desktop_Qt_6_8_3-Debug/.qtc_clangd/.cache/clangd/index/
+
+FrontEnd/build/Desktop_Qt_6_8_3-Debug/.qtc_clangd/
+
+FrontEnd/build/Desktop_Qt_6_8_3-Release/
+
+FrontEnd/build/WebAssembly_Qt_6_8_3_single_threaded-Debug/.qtc_clangd/.cache/clangd/index/
+
+FrontEnd/build/WebAssembly_Qt_6_8_3_single_threaded-Debug/.qtc_clangd/
+
+FrontEnd/build/WebAssembly_Qt_6_8_3_single_threaded-Release/

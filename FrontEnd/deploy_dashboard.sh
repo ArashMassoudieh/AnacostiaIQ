@@ -177,9 +177,74 @@ STAGING="/tmp/dashboard-upload-$STAMP"
 echo "==> Uploading build to staging ($STAGING)"
 ssh "${SSH_OPTS[@]}" "$TARGET" "mkdir -p '$STAGING'"
 
+# The generated loader page needs one patch before it goes up. Qt's stock
+# template leaves #screen at display:none while qtLoad() runs, so Qt sizes its
+# canvas against a zero-height container and paints nothing — the page stays
+# blank until some unrelated window resize (famously, opening devtools) makes
+# Qt re-read the size. Dispatching a resize ourselves once the canvas is
+# actually visible removes that. Patched here rather than in the build tree
+# because Qt regenerates this file on every rebuild.
+PATCHED_HTML=""
+patch_loader() {
+    local src="$1"
+    PATCHED_HTML="$(mktemp -t sensordashboard-XXXXXX.html)"
+    python3 - "$src" "$PATCHED_HTML" <<'PYEOF'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+page = open(src).read()
+
+# Qt's stock showUi() sets the container (#screen) to display:none while the
+# loading spinner is up. The WASM platform plugin measures that container to
+# size its canvas, and a display:none element measures 0x0 — so Qt builds a
+# zero-size canvas and paints nothing. Revealing the container afterwards does
+# not make Qt re-measure, which is why the page stayed blank until an unrelated
+# window resize (opening devtools) forced one.
+#
+# Rather than trying to trigger a re-measure, keep the container laid out for
+# the whole load and overlay the spinner on top of it.
+old_showui = """            const showUi = (ui) => {
+                [spinner, screen].forEach(element => element.style.display = 'none');
+                if (screen === ui)
+                    screen.style.position = 'default';
+                ui.style.display = 'block';
+            }"""
+new_showui = """            const showUi = (ui) => {
+                // Never display:none the Qt container — it is measured to size
+                // the canvas, and a hidden element measures 0x0. Keep it laid
+                // out and show/hide the overlaid loading screen instead.
+                screen.style.display = 'block';
+                spinner.style.display = (ui === spinner) ? 'block' : 'none';
+            }"""
+
+if old_showui not in page:
+    print("    !! showUi() not in the expected form — shipping unpatched", file=sys.stderr)
+    open(dst, "w").write(page)
+    sys.exit(0)
+page = page.replace(old_showui, new_showui, 1)
+
+# Float the loading screen above the canvas now that both are laid out.
+page = page.replace(
+    "#screen { width: 100%; height: 100%; }",
+    "#screen { width: 100%; height: 100%; }\n"
+    "      #qtspinner {\n"
+    "        position: fixed; inset: 0; z-index: 9999; margin: 0;\n"
+    "        background: #fff; overflow: auto;\n"
+    "      }", 1)
+
+open(dst, "w").write(page)
+print("    (patched: container stays laid out, loading screen overlaid)")
+PYEOF
+}
+
 for f in "${REQUIRED_FILES[@]}"; do
     echo "    -> $f"
-    scp "${SCP_OPTS[@]}" -q "$BUILD_DIR/$f" "$TARGET:$STAGING/$f"
+    if [[ "$f" == *.html ]]; then
+        patch_loader "$BUILD_DIR/$f"
+        scp "${SCP_OPTS[@]}" -q "$PATCHED_HTML" "$TARGET:$STAGING/$f"
+        rm -f "$PATCHED_HTML"
+    else
+        scp "${SCP_OPTS[@]}" -q "$BUILD_DIR/$f" "$TARGET:$STAGING/$f"
+    fi
 done
 for f in "${OPTIONAL_FILES[@]}"; do
     if [[ -f "$BUILD_DIR/$f" ]]; then
