@@ -19,9 +19,8 @@ using namespace std::chrono;
 //constexpr unsigned int ECHO_PIN = 24;
 
 // TRIG was GPIO14 (UART0 TXD). Once UART0 is enabled on the Pi for the
-// MB7389-100 sensor, GPIO14/15 are both muxed to the UART peripheral and
-// stop working as plain GPIO — TRIG pulses silently no-op and every
-// measurement times out. GPIO17 is free in this pin map.
+// MB7389-100 sensor, GPIO14/15 conflict with the UART peripheral.
+// GPIO17 is free in this pin map and is used for the HC-SR04 trigger.
 constexpr unsigned int TRIG_PIN = 17;
 constexpr unsigned int ECHO_PIN = 18;
 
@@ -68,8 +67,10 @@ bool wait_for_state(gpiod::line_request& req,
 double getAverageDistance(gpiod::line_request& trig_req,
                           gpiod::line_request& echo_req)
 {
-    constexpr int NUM_SAMPLES = 100;
-    constexpr double CLUSTER_WIDTH = 0.05;   // inches
+    // Keep this diagnostic test short so a disconnected/miswired sensor
+    // reports its failure mode quickly instead of waiting through 100 pings.
+    constexpr int NUM_SAMPLES = 5;
+    constexpr double CLUSTER_WIDTH = 0.25;   // inches
 
     std::vector<double> samples;
 
@@ -89,7 +90,11 @@ double getAverageDistance(gpiod::line_request& trig_req,
                             gpiod::line::value::ACTIVE,
                             ECHO_PIN,
                             std::chrono::milliseconds(50)))
+        {
+            std::cerr << "Sample " << (i + 1)
+                      << ": timeout waiting for ECHO HIGH\n";
             continue;
+        }
 
         auto start = std::chrono::steady_clock::now();
 
@@ -98,7 +103,11 @@ double getAverageDistance(gpiod::line_request& trig_req,
                             gpiod::line::value::INACTIVE,
                             ECHO_PIN,
                             std::chrono::milliseconds(50)))
+        {
+            std::cerr << "Sample " << (i + 1)
+                      << ": timeout waiting for ECHO LOW\n";
             continue;
+        }
 
         auto end = std::chrono::steady_clock::now();
 
@@ -109,24 +118,18 @@ double getAverageDistance(gpiod::line_request& trig_req,
 
         samples.push_back(distance);
 
-        //std::cout << "Pulse width = "
-        //          << duration
-        //          << " us  Distance = "
-        //          << distance
-        //          << " in" << std::endl;
+        std::cout << "Sample " << (i + 1)
+                  << ": pulse width = " << duration
+                  << " us, distance = " << distance
+                  << " in" << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
-    if (samples.size() < 5)
+    if (samples.empty())
         return NAN;
 
     std::sort(samples.begin(), samples.end());
-
-    //std::cout << "Sorted: ";
-    //for (double d : samples)
-    //    std::cout << d << " ";
-    //std::cout << std::endl;
 
     // Find the largest cluster
     size_t bestStart = 0;
@@ -193,6 +196,8 @@ int main()
                             .do_request();
 
         cout << "HC-SR04 depth monitor started\n";
+        cout << "TRIG=GPIO" << TRIG_PIN
+             << ", ECHO=GPIO" << ECHO_PIN << '\n';
 
         for (;;)
         {
@@ -200,8 +205,8 @@ int main()
 
             if (std::isnan(measured_distance))
             {
-                std::cerr << "Measurement failed\n";
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::cerr << "Measurement failed: no valid ECHO pulse detected\n";
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 continue;
             }
 
