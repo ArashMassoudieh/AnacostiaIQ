@@ -37,7 +37,7 @@
   },
   "sensors": [
     {
-      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO15 (header pin 10), ECHO on GPIO18 (header pin 12). NOTE: GPIO15 is also UART0 RXD, which the MB7389-100 entry below needs. If both sensors are wired at once, move TRIG to a free line — GPIO17 and GPIO23/24 are unused in this pin map.",
+      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match.",
       "type": "distance",
       "id": "hcsr04_depth",
       "unit": "in",
@@ -46,13 +46,13 @@
       "samplesPerReading": 10,
       "params": {
         "chip": "/dev/gpiochip0",
-        "trigPin": 15,
+        "trigPin": 17,
         "echoPin": 18,
         "totalLength": 48
       }
     },
     {
-      "_comment": "MB7389-100, per MB7389-100_ultrasonic_sensor_2/main.cpp: it is read over UART, not over a bit-banged GPIO. Its pin-5 serial output goes to the Pi's UART0 RXD (GPIO15, header pin 10) and the app reads /dev/ttyAMA0 at 9600 8N1. There is no separate 'wireSerialPin' — the device path is the whole configuration. The id is kept as 'maxbotix_depth' so its history in the cloud DB stays continuous.",
+      "_comment": "MB7389-100: read over UART, not bit-banged GPIO. Its pin-5 serial output goes to the Pi header UART RX (GPIO15, header pin 10). On this Pi 5, that UART is exposed as /dev/serial0 (-> ttyAMA10, the RP1 PL011) — NOT /dev/ttyAMA0, which on Pi 5 is a separate SoC-internal UART not wired to the header at all. The app reads it at 9600 8N1. The id is kept as maxbotix_depth so its history in the cloud DB stays continuous.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
@@ -60,7 +60,7 @@
       "intervalSeconds": 5,
       "samplesPerReading": 10,
       "params": {
-        "device": "/dev/ttyAMA0",
+        "device": "/dev/serial0",
         "totalLength": 48
       }
     },

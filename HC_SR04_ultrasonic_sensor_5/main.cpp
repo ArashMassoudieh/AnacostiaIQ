@@ -18,7 +18,11 @@ using namespace std::chrono;
 //constexpr unsigned int TRIG_PIN = 23;
 //constexpr unsigned int ECHO_PIN = 24;
 
-constexpr unsigned int TRIG_PIN = 14;
+// TRIG was GPIO14 (UART0 TXD). Once UART0 is enabled on the Pi for the
+// MB7389-100 sensor, GPIO14/15 are both muxed to the UART peripheral and
+// stop working as plain GPIO — TRIG pulses silently no-op and every
+// measurement times out. GPIO17 is free in this pin map.
+constexpr unsigned int TRIG_PIN = 17;
 constexpr unsigned int ECHO_PIN = 18;
 
 // Pipe dimensions in inches
