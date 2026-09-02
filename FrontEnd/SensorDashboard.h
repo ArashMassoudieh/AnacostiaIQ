@@ -27,6 +27,8 @@
 #include <QtCharts/QAreaSeries>
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QValueAxis>
+
+QT_CHARTS_USE_NAMESPACE
 #include <QDateTime>
 #include <QDebug>
 

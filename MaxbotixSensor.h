@@ -22,7 +22,7 @@ class MaxbotixSensor : public Sensor {
     Q_OBJECT
 
 public:
-    // device      — serial port, e.g. "/dev/ttyAMA0"
+    // device      — serial port, e.g. "/dev/serial0"
     // unit        — "mm", "cm", or "in"; drives both the reported unit
     //               AND the conversion applied to the raw mm reading
     // totalLength — full pipe/standpipe length in the configured unit;

@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
 {
     try
     {
-        string uart_device = "/dev/ttyAMA0";
+        string uart_device = "/dev/serial0";
 
         if (argc > 1)
         {

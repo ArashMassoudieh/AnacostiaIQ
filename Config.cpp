@@ -179,7 +179,7 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
                                         adcDry, adcWet);
         }
         else if (type == "maxbotix") {
-            QString device     = params.value("device").toString("/dev/ttyAMA0");
+            QString device     = params.value("device").toString("/dev/serial0");
             double  totalLength = params.value("totalLength").toDouble(0.0);
             sensor = new MaxbotixSensor(id, unit, name, device, totalLength);
         }

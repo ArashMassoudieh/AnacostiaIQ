@@ -15,7 +15,7 @@ struct MB7389Data
 };
 
 bool initMB7389(
-    const std::string& device = "/dev/ttyAMA0");
+    const std::string& device = "/dev/serial0");
 
 bool readMB7389(MB7389Data& data);
 

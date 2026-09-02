@@ -69,14 +69,13 @@ void SensorDashboard::finishInitialization()
     //    default list and let GET /sensors refine it.
     sensorIds = config.visibleSensorIds();
     if (sensorIds.isEmpty()) {
-        sensorIds = {
-            "precip_amount",
-            "precip_prob",
-            "temperature",
-            "water_depth",
-            "valve_state",
-            "moisture_sensor"
-        };
+        sensorIds = QStringList()
+            << "precip_amount"
+            << "precip_prob"
+            << "temperature"
+            << "water_depth"
+            << "valve_state"
+            << "moisture_sensor";
     }
 
     // Auto-refresh timer (interval from config)
