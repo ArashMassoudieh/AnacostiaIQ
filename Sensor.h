@@ -18,9 +18,11 @@
 //    hide POSIX read() inside a subclass — MaxbotixSensor talks to
 //    a serial fd.)
 //
-//  Metadata (id + unit) lives on the base class so the
-//  monitoring loop can iterate over a list of Sensor* and push
-//  each reading to the cloud DB without knowing the concrete type.
+//  Recovery contract:
+//    On Raspberry Pi, an unavailable sensor is retried every 30 s.
+//    Three consecutive completely-invalid readings also mark an
+//    otherwise-initialized sensor unavailable, allowing a temporarily
+//    disconnected GPIO/UART device to rejoin without restarting the app.
 /////////////////////////////////////////////////////////////
 
 #ifndef SENSOR_H
@@ -29,6 +31,7 @@
 #include <QObject>
 #include <QString>
 #include <QDebug>
+#include <QTimer>
 
 #include <chrono>
 #include <thread>
@@ -46,7 +49,28 @@ public:
         : QObject(parent),
           m_id(id),
           m_unit(unit),
-          m_name(name.isEmpty() ? id : name) {}
+          m_name(name.isEmpty() ? id : name) {
+#ifdef RasPi
+        m_recoveryTimer.setInterval(RECOVERY_INTERVAL_MS);
+        m_recoveryTimer.setSingleShot(false);
+        connect(&m_recoveryTimer, &QTimer::timeout, this, [this]() {
+            if (m_available) {
+                m_recoveryTimer.stop();
+                return;
+            }
+
+            // Release any half-open descriptor/GPIO request before trying
+            // the hardware-specific initialize() again.
+            cleanup();
+            qInfo() << "Sensor" << m_id << ": attempting recovery";
+            if (initialize()) {
+                m_consecutiveFailures = 0;
+                qInfo() << "Sensor" << m_id << ": recovered";
+                m_recoveryTimer.stop();
+            }
+        });
+#endif
+    }
 
     ~Sensor() override = default;
 
@@ -90,8 +114,21 @@ public:
             }
         }
 
-        if (valid == 0)
+        if (valid == 0) {
+            ++m_consecutiveFailures;
+#ifdef RasPi
+            if (m_available && m_consecutiveFailures >= FAILURE_LIMIT) {
+                qWarning() << "Sensor" << m_id << ":"
+                           << m_consecutiveFailures
+                           << "consecutive readings failed — scheduling recovery";
+                setAvailable(false);
+            }
+#endif
             return -1;
+        }
+
+        m_consecutiveFailures = 0;
+
         if (valid < n)
             qWarning() << "Sensor" << m_id << ": averaged" << valid
                        << "of" << n << "samples —" << (n - valid) << "failed";
@@ -131,16 +168,32 @@ public:
     static bool isValid(double reading) { return reading >= 0.0; }
 
 protected:
-    // Subclasses call this from initialize() (and may toggle it
-    // on a persistent read failure if they want isAvailable() to
-    // reflect that).
-    void setAvailable(bool a) { m_available = a; }
+    // Subclasses call this from initialize(). On Pi, a false state starts a
+    // shared 30-second recovery loop; a true state cancels it. This keeps
+    // recovery behaviour identical in GUI and headless builds.
+    void setAvailable(bool a) {
+        m_available = a;
+        if (a) {
+            m_consecutiveFailures = 0;
+#ifdef RasPi
+            m_recoveryTimer.stop();
+#endif
+        } else {
+#ifdef RasPi
+            if (!m_recoveryTimer.isActive())
+                m_recoveryTimer.start();
+#endif
+        }
+    }
+
     void setFullScale(double fs) { m_fullScale = fs; }
 
 private:
     // HC-SR04 datasheet: allow ~60 ms between triggers so the previous
     // burst has decayed. Harmless for the others.
     static constexpr int INTER_SAMPLE_MS = 60;
+    static constexpr int RECOVERY_INTERVAL_MS = 30 * 1000;
+    static constexpr int FAILURE_LIMIT = 3;
 
     QString m_id;
     QString m_unit;
@@ -149,6 +202,10 @@ private:
     double  m_fullScale = 0.0;
     int     m_intervalSeconds = 0;   // 0 = use app-level default
     int     m_samplesPerReading = 1; // 1 = no averaging
+    int     m_consecutiveFailures = 0;
+#ifdef RasPi
+    QTimer  m_recoveryTimer;
+#endif
 };
 
 #endif // SENSOR_H
