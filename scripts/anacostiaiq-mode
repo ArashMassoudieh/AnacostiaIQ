@@ -9,7 +9,6 @@ REPO_DIR="${ANACOSTIAIQ_REPO:-$HOME/AnacostiaIQ}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/anacostiaiq"
 MODE_FILE="$STATE_DIR/mode"
 HEADLESS_SERVICE="anacostiaiqd.service"
-GUI_BIN="$REPO_DIR/AnacostiaIQ"
 
 mkdir -p "$STATE_DIR"
 
@@ -32,6 +31,34 @@ write_mode() {
     mv -f "$tmp" "$MODE_FILE"
 }
 
+find_gui_bin() {
+    if [[ -n "${ANACOSTIAIQ_GUI_BIN:-}" && -x "$ANACOSTIAIQ_GUI_BIN" ]]; then
+        printf '%s\n' "$ANACOSTIAIQ_GUI_BIN"
+        return 0
+    fi
+
+    local candidate
+    for candidate in \
+        "$REPO_DIR/AnacostiaIQ" \
+        "$REPO_DIR/build/Desktop-Debug/AnacostiaIQ" \
+        "$REPO_DIR/build/AnacostiaIQ"; do
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    # Qt Creator commonly places shadow builds beside the source tree.
+    candidate="$(find "$REPO_DIR" "$(dirname "$REPO_DIR")" -maxdepth 4 \
+        -type f -name AnacostiaIQ -perm -u+x 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    return 1
+}
+
 stop_gui() {
     # GUI and headless must never claim GPIO/UART hardware simultaneously.
     pkill -TERM -x AnacostiaIQ 2>/dev/null || true
@@ -46,12 +73,15 @@ start_gui() {
         echo "AnacostiaIQ GUI is already running."
         return 0
     fi
-    if [[ ! -x "$GUI_BIN" ]]; then
-        echo "GUI executable not found: $GUI_BIN" >&2
+
+    local gui_bin
+    if ! gui_bin="$(find_gui_bin)"; then
+        echo "AnacostiaIQ GUI executable was not found. Build the GUI or set ANACOSTIAIQ_GUI_BIN." >&2
         return 1
     fi
-    (cd "$REPO_DIR" && nohup "$GUI_BIN" >/tmp/anacostiaiq-gui.log 2>&1 &)
-    echo "Started AnacostiaIQ GUI."
+
+    (cd "$REPO_DIR" && nohup "$gui_bin" >/tmp/anacostiaiq-gui.log 2>&1 &)
+    echo "Started AnacostiaIQ GUI: $gui_bin"
 }
 
 cmd="${1:-status}"
