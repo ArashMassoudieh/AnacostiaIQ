@@ -28,15 +28,21 @@ QString RuntimeModeGuard::lockFilePath()
 RuntimeModeGuard::RuntimeModeGuard(const QString &mode)
     : m_lock(lockFilePath())
 {
-    // A stale lock from a crash or hard power loss should be reclaimed
-    // quickly after reboot. QLockFile also checks whether the recorded PID
-    // is still alive before deciding a lock is active.
+    // QLockFile records PID/host/application information. A lock left by a
+    // crash or hard power loss is eligible for stale-lock cleanup; an active
+    // GUI/headless owner is not removed.
     m_lock.setStaleLockTime(10000);
 
     if (!m_lock.tryLock(0)) {
-        m_error = QStringLiteral(
-            "Another AnacostiaIQ process already owns the sensor hardware");
-        return;
+        // Important for desktop autostart after a hard outage: there may be a
+        // lock file on disk even though the old process no longer exists.
+        // removeStaleLockFile() removes it only when QLockFile considers it
+        // stale, then we retry ownership once.
+        if (!m_lock.removeStaleLockFile() || !m_lock.tryLock(0)) {
+            m_error = QStringLiteral(
+                "Another AnacostiaIQ process already owns the sensor hardware");
+            return;
+        }
     }
 
     m_acquired = true;
