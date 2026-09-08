@@ -1,1 +1,0 @@
-The headless service must not depend on network availability. Sensor acquisition should start even when Internet access is unavailable.
