@@ -30,6 +30,7 @@ COPIES += config_copy
 
 SOURCES += \
     DatabaseWriter.cpp \
+    RuntimeModeGuard.cpp \
     Config.cpp \
     AdcBus.cpp \
     RainPolicy.cpp \
@@ -43,6 +44,7 @@ SOURCES += \
 
 HEADERS += \
     DatabaseWriter.h \
+    RuntimeModeGuard.h \
     Config.h \
     Sensor.h \
     AdcBus.h \
