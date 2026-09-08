@@ -15,6 +15,9 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QVector>
+#include <QList>
+#include <QTimer>
+#include <QString>
 
 #include "WeatherFetcher.h"
 
@@ -28,7 +31,9 @@ public:
     // Override the API endpoint (e.g. from config). Pass the full URL.
     void setApiUrl(const QString &url);
 
-    // Generic: send a single reading to the API
+    // Generic: queue a single reading locally and deliver it to the API.
+    // The local queue is persistent, so a network/API outage does not lose
+    // measurements. Pending records are retried automatically oldest-first.
     void sendReading(const QString &sensorId, double value,
                      const QString &unit, const QDateTime &timestamp = QDateTime());
 
@@ -42,15 +47,32 @@ public:
     void sendMoistureReading(double moist);
     void sendValveState(bool open);
 
+    int pendingCount() const { return pending.size(); }
+    QString queueFilePath() const { return queuePath; }
+
 private slots:
     void onReplyFinished(QNetworkReply *reply);
+    void trySendNext();
 
 private:
     QNetworkAccessManager *manager;
     QUrl apiUrl;
 
-    void postJson(const QJsonObject &json);
+    QList<QJsonObject> pending;
+    QString queuePath;
+    QTimer retryTimer;
+    bool inFlight = false;
     int failCount = 0;
+    int retryDelayMs = 5000;
+
+    static constexpr int INITIAL_RETRY_MS = 5000;
+    static constexpr int MAX_RETRY_MS = 5 * 60 * 1000;
+
+    QString resolveQueuePath() const;
+    void loadQueue();
+    bool appendToQueueFile(const QJsonObject &json);
+    bool rewriteQueueFile();
+    void scheduleRetry();
 };
 
 #endif // DATABASEWRITER_H
