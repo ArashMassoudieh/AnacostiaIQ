@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=AnacostiaIQ GUI Restore
+Comment=Restore AnacostiaIQ GUI when GUI was the last selected runtime mode
+Exec=@REPO_DIR@/scripts/anacostiaiq-mode restore-gui
+Terminal=false
+X-GNOME-Autostart-enabled=true
