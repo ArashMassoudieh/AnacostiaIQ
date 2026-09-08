@@ -1,0 +1,1 @@
+The startup integration is intentionally network-independent: neither GUI nor headless acquisition requires Internet connectivity in order to start. The systemd user service should not be ordered after network-online.target.
