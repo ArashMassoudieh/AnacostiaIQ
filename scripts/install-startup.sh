@@ -15,7 +15,7 @@ SERVICE_FILE="$USER_SYSTEMD_DIR/anacostiaiqd.service"
 AUTOSTART_FILE="$AUTOSTART_DIR/anacostiaiq-gui.desktop"
 
 mkdir -p "$STATE_DIR" "$USER_SYSTEMD_DIR" "$AUTOSTART_DIR"
-chmod +x "$REPO_DIR/scripts/anacostiaiq-mode"
+chmod +x "$REPO_DIR/scripts/anacostiaiq-mode" "$REPO_DIR/scripts/anacostiaiq-check"
 
 # On first installation, preserve what is actually running now.
 if [[ ! -f "$MODE_FILE" ]]; then
@@ -67,4 +67,5 @@ echo "Installed AnacostiaIQ startup recovery."
 echo "Current mode: $($REPO_DIR/scripts/anacostiaiq-mode status)"
 echo "Switch to GUI:      $REPO_DIR/scripts/anacostiaiq-mode gui"
 echo "Switch to headless: $REPO_DIR/scripts/anacostiaiq-mode headless"
+echo "Run system check:   $REPO_DIR/scripts/anacostiaiq-check"
 echo "Headless status:    systemctl --user status anacostiaiqd.service"
