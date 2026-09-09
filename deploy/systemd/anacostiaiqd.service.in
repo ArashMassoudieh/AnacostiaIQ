@@ -4,7 +4,7 @@ Description=AnacostiaIQ Headless Sensor Monitor
 [Service]
 Type=simple
 WorkingDirectory=@REPO_DIR@
-ExecCondition=@REPO_DIR@/scripts/anacostiaiq-mode is-headless
+ExecCondition=/bin/bash @REPO_DIR@/scripts/anacostiaiq-mode is-headless
 ExecStart=@REPO_DIR@/headless/anacostiaiqd --config @REPO_DIR@/config.json
 Restart=always
 RestartSec=5
