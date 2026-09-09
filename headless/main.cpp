@@ -7,6 +7,7 @@
 /////////////////////////////////////////////////////////////
 
 #include "HeadlessMonitor.h"
+#include "RuntimeModeGuard.h"
 
 #include <QCoreApplication>
 #include <QCommandLineParser>
@@ -20,10 +21,6 @@
 #include <cstdio>
 #include <sys/socket.h>
 #include <unistd.h>
-
-// ================================================================
-//  Logging: timestamp + level on every line
-// ================================================================
 
 static void logHandler(QtMsgType type, const QMessageLogContext &,
                        const QString &msg) {
@@ -39,36 +36,20 @@ static void logHandler(QtMsgType type, const QMessageLogContext &,
     }
 
     FILE *sink = toStdErr ? stderr : stdout;
-
     QTextStream out(sink);
     out << QDateTime::currentDateTime().toString(Qt::ISODate)
         << " [" << level << "] " << msg << Qt::endl;
     out.flush();
-
-    // QTextStream only flushes as far as the FILE*. Under systemd or a
-    // pipe, stdout is block-buffered, so without this the log arrives
-    // in 4 KB bursts — or not at all if we're killed first.
     std::fflush(sink);
 
     if (type == QtFatalMsg)
         abort();
 }
 
-// ================================================================
-//  Unix signals -> Qt event loop
-// ================================================================
-//  A signal handler can't safely touch Qt objects, so it does the one
-//  async-signal-safe thing available and writes a byte to a socket.
-//  QSocketNotifier picks it up on the event loop, where shutting down
-//  is safe.
-
 static int sigFd[2];
 
 static void unixSignalHandler(int) {
     const char byte = 1;
-    // Nothing useful to do if this fails, and we're in a signal handler
-    // so we can't report it. Bind the result to silence -Wunused-result
-    // (a bare (void) cast doesn't, on GCC).
     const ssize_t written = ::write(sigFd[0], &byte, sizeof(byte));
     static_cast<void>(written);
 }
@@ -101,14 +82,6 @@ static bool installSignalHandlers(QCoreApplication &app,
     return true;
 }
 
-// ================================================================
-//  Config path
-// ================================================================
-//  --config wins. Otherwise prefer the copy next to the executable
-//  (what the .pro installs, and what works when systemd starts us
-//  with an unrelated working directory), then fall back to the CWD
-//  like the GUI does.
-
 static QString resolveConfigPath(const QString &explicitPath) {
     if (!explicitPath.isEmpty())
         return explicitPath;
@@ -120,10 +93,6 @@ static QString resolveConfigPath(const QString &explicitPath) {
 
     return QStringLiteral("config.json");
 }
-
-// ================================================================
-//  Main
-// ================================================================
 
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
@@ -146,6 +115,12 @@ int main(int argc, char *argv[]) {
         "path");
     parser.addOption(configOption);
     parser.process(app);
+
+    RuntimeModeGuard modeGuard("headless");
+    if (!modeGuard.acquired()) {
+        qCritical().noquote() << modeGuard.errorString();
+        return 2;
+    }
 
     const QString configPath = resolveConfigPath(parser.value(configOption));
 

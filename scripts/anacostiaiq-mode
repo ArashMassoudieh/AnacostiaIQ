@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# AnacostiaIQ runtime-mode manager.
+# Stores the last requested mode in the user's persistent state directory.
+# Both the systemd headless service and desktop GUI autostart read this file.
+
+REPO_DIR="${ANACOSTIAIQ_REPO:-$HOME/AnacostiaIQ}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/anacostiaiq"
+MODE_FILE="$STATE_DIR/mode"
+HEADLESS_SERVICE="anacostiaiqd.service"
+
+mkdir -p "$STATE_DIR"
+
+read_mode() {
+    if [[ -r "$MODE_FILE" ]]; then
+        case "$(tr -d '[:space:]' < "$MODE_FILE")" in
+            gui)      printf '%s\n' gui ;;
+            headless) printf '%s\n' headless ;;
+            *)        printf '%s\n' headless ;;
+        esac
+    else
+        printf '%s\n' headless
+    fi
+}
+
+write_mode() {
+    local mode="$1"
+    local tmp="$MODE_FILE.tmp.$$"
+    printf '%s\n' "$mode" > "$tmp"
+    mv -f "$tmp" "$MODE_FILE"
+}
+
+find_gui_bin() {
+    if [[ -n "${ANACOSTIAIQ_GUI_BIN:-}" && -x "$ANACOSTIAIQ_GUI_BIN" ]]; then
+        printf '%s\n' "$ANACOSTIAIQ_GUI_BIN"
+        return 0
+    fi
+
+    local candidate
+    for candidate in \
+        "$REPO_DIR/AnacostiaIQ" \
+        "$REPO_DIR/build/Desktop-Debug/AnacostiaIQ" \
+        "$REPO_DIR/build/AnacostiaIQ"; do
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    # Qt Creator commonly places shadow builds beside the source tree.
+    candidate="$(find "$REPO_DIR" "$(dirname "$REPO_DIR")" -maxdepth 4 \
+        -type f -name AnacostiaIQ -perm -u+x 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    return 1
+}
+
+stop_gui() {
+    # GUI and headless must never claim GPIO/UART hardware simultaneously.
+    pkill -TERM -x AnacostiaIQ 2>/dev/null || true
+}
+
+start_gui() {
+    if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+        echo "GUI mode saved. It will start automatically at the next graphical login."
+        return 0
+    fi
+    if pgrep -x AnacostiaIQ >/dev/null 2>&1; then
+        echo "AnacostiaIQ GUI is already running."
+        return 0
+    fi
+
+    local gui_bin
+    if ! gui_bin="$(find_gui_bin)"; then
+        echo "AnacostiaIQ GUI executable was not found. Build the GUI or set ANACOSTIAIQ_GUI_BIN." >&2
+        return 1
+    fi
+
+    (cd "$REPO_DIR" && nohup "$gui_bin" >/tmp/anacostiaiq-gui.log 2>&1 &)
+    echo "Started AnacostiaIQ GUI: $gui_bin"
+}
+
+cmd="${1:-status}"
+case "$cmd" in
+    status|get)
+        echo "$(read_mode)"
+        ;;
+    check)
+        bash "$REPO_DIR/scripts/anacostiaiq-check"
+        ;;
+    is-headless)
+        [[ "$(read_mode)" == "headless" ]]
+        ;;
+    is-gui)
+        [[ "$(read_mode)" == "gui" ]]
+        ;;
+    headless)
+        write_mode headless
+        stop_gui
+        systemctl --user restart "$HEADLESS_SERVICE"
+        echo "Mode set to headless."
+        ;;
+    gui)
+        write_mode gui
+        systemctl --user stop "$HEADLESS_SERVICE" || true
+        start_gui
+        echo "Mode set to gui."
+        ;;
+    restore-gui)
+        if [[ "$(read_mode)" == "gui" ]]; then
+            systemctl --user stop "$HEADLESS_SERVICE" || true
+            start_gui
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {status|check|headless|gui|restore-gui|is-headless|is-gui}" >&2
+        exit 2
+        ;;
+esac

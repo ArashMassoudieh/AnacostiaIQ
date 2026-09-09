@@ -47,6 +47,7 @@ COPIES += config_copy
 
 SOURCES += \
     $$PWD/../DatabaseWriter.cpp \
+    $$PWD/../RuntimeModeGuard.cpp \
     $$PWD/../Config.cpp \
     $$PWD/../AdcBus.cpp \
     $$PWD/../RainPolicy.cpp \
@@ -59,6 +60,7 @@ SOURCES += \
 
 HEADERS += \
     $$PWD/../DatabaseWriter.h \
+    $$PWD/../RuntimeModeGuard.h \
     $$PWD/../Config.h \
     $$PWD/../Sensor.h \
     $$PWD/../AdcBus.h \
