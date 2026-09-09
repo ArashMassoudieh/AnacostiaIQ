@@ -211,14 +211,18 @@ section 'Repository' '----------'
 if [[ -d "$REPO_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
     BRANCH="$(git -C "$REPO_DIR" branch --show-current 2>/dev/null || true)"
     SHA="$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || true)"
-    DIRTY="$(git -C "$REPO_DIR" status --porcelain 2>/dev/null || true)"
+    TRACKED_DIRTY="$(git -C "$REPO_DIR" status --porcelain --untracked-files=no 2>/dev/null || true)"
+    UNTRACKED_COUNT="$(git -C "$REPO_DIR" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d '[:space:]')"
     info 'Git revision' "${BRANCH:-detached} ${SHA:-unknown}"
-    if [[ -z "$DIRTY" ]]; then
-        pass 'Working tree' 'clean'
-    elif [[ "$DIRTY" == ' M scripts/anacostiaiq-check' ]]; then
-        pass 'Working tree' 'clean except local executable bit on check helper'
+    if [[ -z "$TRACKED_DIRTY" ]]; then
+        pass 'Tracked source tree' 'clean'
     else
-        warn 'Working tree' 'local changes present'
+        warn 'Tracked source tree' 'tracked local changes present'
+    fi
+    if [[ "${UNTRACKED_COUNT:-0}" -gt 0 ]]; then
+        info 'Untracked build files' "$UNTRACKED_COUNT present (not treated as source changes)"
+    else
+        info 'Untracked build files' '0'
     fi
 else
     warn 'Repository' "$REPO_DIR is not a Git checkout"
