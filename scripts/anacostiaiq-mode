@@ -89,6 +89,9 @@ case "$cmd" in
     status|get)
         echo "$(read_mode)"
         ;;
+    check)
+        bash "$REPO_DIR/scripts/anacostiaiq-check"
+        ;;
     is-headless)
         [[ "$(read_mode)" == "headless" ]]
         ;;
@@ -114,7 +117,7 @@ case "$cmd" in
         fi
         ;;
     *)
-        echo "Usage: $0 {status|headless|gui|restore-gui|is-headless|is-gui}" >&2
+        echo "Usage: $0 {status|check|headless|gui|restore-gui|is-headless|is-gui}" >&2
         exit 2
         ;;
 esac
