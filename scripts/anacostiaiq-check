@@ -21,6 +21,10 @@ pass()  { PASS=$((PASS+1)); line '[PASS]' "$1" "${2:-}"; }
 warn()  { WARN=$((WARN+1)); line '[WARN]' "$1" "${2:-}"; }
 fail()  { FAIL=$((FAIL+1)); line '[FAIL]' "$1" "${2:-}"; }
 info()  { line '[INFO]' "$1" "${2:-}"; }
+section() {
+    printf '\n%s\n' "$1"
+    printf '%s\n' "$2"
+}
 
 read_mode() {
     if [[ -r "$MODE_FILE" ]]; then
@@ -38,12 +42,11 @@ service_enabled() {
     systemctl --user is-enabled "$SERVICE" 2>/dev/null || true
 }
 
-printf '\n============================================================\n'
-printf ' AnacostiaIQ System Check\n'
-printf '============================================================\n\n'
+printf '\n%s\n' '============================================================'
+printf '%s\n' ' AnacostiaIQ System Check'
+printf '%s\n\n' '============================================================'
 
-printf 'Runtime\n'
-printf '-------\n'
+section 'Runtime' '-------'
 MODE="$(read_mode)"
 case "$MODE" in
     gui|headless) pass 'Saved mode' "$MODE" ;;
@@ -96,8 +99,7 @@ else
     fi
 fi
 
-printf '\nStartup recovery\n'
-printf '----------------\n'
+section 'Startup recovery' '----------------'
 if [[ -f "$HOME/.config/systemd/user/$SERVICE" ]]; then
     pass 'User service' 'installed'
 else
@@ -138,18 +140,18 @@ else
     warn 'GUI autostart' 'not installed'
 fi
 
-printf '\nHardware / interfaces\n'
-printf '---------------------\n'
+section 'Hardware / interfaces' '---------------------'
 if [[ -L /dev/serial0 || -e /dev/serial0 ]]; then
     SERIAL_TARGET="$(readlink -f /dev/serial0 2>/dev/null || printf '/dev/serial0')"
     pass '/dev/serial0' "$SERIAL_TARGET"
 
     SERIAL_UNIT="serial-getty@$(basename "$SERIAL_TARGET").service"
     SERIAL_GETTY_STATE="$(systemctl is-active "$SERIAL_UNIT" 2>/dev/null || true)"
+    SERIAL_GETTY_ENABLED="$(systemctl is-enabled "$SERIAL_UNIT" 2>/dev/null || true)"
     if [[ "$SERIAL_GETTY_STATE" == active ]]; then
-        fail 'Serial getty' "$SERIAL_UNIT is occupying UART"
+        fail 'Serial getty' "$SERIAL_UNIT active (enabled=$SERIAL_GETTY_ENABLED)"
     else
-        pass 'Serial getty' 'not active on sensor UART'
+        pass 'Serial getty' "inactive (enabled=$SERIAL_GETTY_ENABLED)"
     fi
 else
     warn '/dev/serial0' 'not present'
@@ -160,8 +162,7 @@ if [[ -r /proc/device-tree/model ]]; then
     info 'Device' "$MODEL"
 fi
 
-printf '\nCloud queue\n'
-printf '-----------\n'
+section 'Cloud queue' '-----------'
 if [[ -e "$QUEUE_FILE" ]]; then
     if [[ -r "$QUEUE_FILE" && -w "$QUEUE_FILE" ]]; then
         pass 'Upload queue' 'readable/writable'
@@ -177,8 +178,7 @@ else
     info 'Pending uploads' '0'
 fi
 
-printf '\nRecent sensor/recovery evidence\n'
-printf '-------------------------------\n'
+section 'Recent sensor/recovery evidence' '-------------------------------'
 LOG_SOURCE=''
 if [[ "$MODE" == gui && -r /tmp/anacostiaiq-gui.log ]]; then
     LOG_SOURCE=/tmp/anacostiaiq-gui.log
@@ -207,8 +207,7 @@ else
     info 'Sensor logs' 'run mode-specific logs for detailed sensor status'
 fi
 
-printf '\nRepository\n'
-printf '----------\n'
+section 'Repository' '----------'
 if [[ -d "$REPO_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
     BRANCH="$(git -C "$REPO_DIR" branch --show-current 2>/dev/null || true)"
     SHA="$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || true)"
@@ -216,6 +215,8 @@ if [[ -d "$REPO_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
     info 'Git revision' "${BRANCH:-detached} ${SHA:-unknown}"
     if [[ -z "$DIRTY" ]]; then
         pass 'Working tree' 'clean'
+    elif [[ "$DIRTY" == ' M scripts/anacostiaiq-check' ]]; then
+        pass 'Working tree' 'clean except local executable bit on check helper'
     else
         warn 'Working tree' 'local changes present'
     fi
@@ -223,18 +224,18 @@ else
     warn 'Repository' "$REPO_DIR is not a Git checkout"
 fi
 
-printf '\n============================================================\n'
+printf '\n%s\n' '============================================================'
 printf ' PASS: %d   WARN: %d   FAIL: %d\n' "$PASS" "$WARN" "$FAIL"
 if (( FAIL > 0 )); then
-    printf ' Overall: FAIL\n'
+    printf '%s\n' ' Overall: FAIL'
     RESULT=2
 elif (( WARN > 0 )); then
-    printf ' Overall: PASS WITH WARNINGS\n'
+    printf '%s\n' ' Overall: PASS WITH WARNINGS'
     RESULT=1
 else
-    printf ' Overall: PASS\n'
+    printf '%s\n' ' Overall: PASS'
     RESULT=0
 fi
-printf '============================================================\n\n'
+printf '%s\n\n' '============================================================'
 
 exit "$RESULT"
