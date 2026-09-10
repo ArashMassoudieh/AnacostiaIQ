@@ -19,8 +19,8 @@
     "latitude": 38.98,
     "longitude": -77.10,
     "noaaOffice": "LWX",
-    "gridX": 97,
-    "gridY": 71
+    "noaaGridX": 97,
+    "noaaGridY": 71
   },
   "adc": {
     "_comment": "Shared ADC0804 + CD4014 bank, pinned to match All_inclusive_sensor_program/ADC.cpp — the version that currently reads correctly on the Pi. Every 'moisture' sensor is one channel on it: the control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. NOTE on 'chip': the older Automated_Multi-ADC_sensing_1 test used /dev/gpiochip4, but the Pi 5 kernel renumbered the RP1 bank to /dev/gpiochip0 — if you see 'AdcBus: GPIO init failed' in the log, check this first with 'gpiodetect'. powerPin is -1 because neither working program drives a supply-enable line; the bank is fed from the 5V rail. wrHighUs is how long WR is held high to trigger a conversion and conversionDelayMs how long to wait after it drops before shifting the byte out (no INTR line is wired, so completion can't be sensed). pulseWidthUs/settleUs are the clock pulse width and the settle either side of the P/S load. These four values reproduce the working program's timing exactly; shrink them only if the readings stay stable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
