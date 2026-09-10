@@ -19,8 +19,8 @@
     "latitude": 38.98,
     "longitude": -77.10,
     "noaaOffice": "LWX",
-    "noaaGridX": 97,
-    "noaaGridY": 71
+    "gridX": 97,
+    "gridY": 71
   },
   "adc": {
     "_comment": "Shared ADC0804 + CD4014 bank, pinned to match All_inclusive_sensor_program/ADC.cpp — the version that currently reads correctly on the Pi. Every 'moisture' sensor is one channel on it: the control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. NOTE on 'chip': the older Automated_Multi-ADC_sensing_1 test used /dev/gpiochip4, but the Pi 5 kernel renumbered the RP1 bank to /dev/gpiochip0 — if you see 'AdcBus: GPIO init failed' in the log, check this first with 'gpiodetect'. powerPin is -1 because neither working program drives a supply-enable line; the bank is fed from the 5V rail. wrHighUs is how long WR is held high to trigger a conversion and conversionDelayMs how long to wait after it drops before shifting the byte out (no INTR line is wired, so completion can't be sensed). pulseWidthUs/settleUs are the clock pulse width and the settle either side of the P/S load. These four values reproduce the working program's timing exactly; shrink them only if the readings stay stable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
@@ -37,7 +37,7 @@
   },
   "sensors": [
     {
-      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match.",
+      "_comment": "HC-SR04, per the verified lab wiring: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12) through the 1k/2k voltage divider. GPIO17 avoids the UART RX line used by the MB7389 below.",
       "type": "distance",
       "id": "hcsr04_depth",
       "unit": "in",
@@ -52,7 +52,7 @@
       }
     },
     {
-      "_comment": "MB7389-100: read over UART, not bit-banged GPIO. Its pin-5 serial output goes to the Pi header UART RX (GPIO15, header pin 10). On this Pi 5, that UART is exposed as /dev/serial0 (-> ttyAMA10, the RP1 PL011) — NOT /dev/ttyAMA0, which on Pi 5 is a separate SoC-internal UART not wired to the header at all. The app reads it at 9600 8N1. The id is kept as maxbotix_depth so its history in the cloud DB stays continuous.",
+      "_comment": "MB7389-100: sensor serial output (pin 5) goes to Pi UART RX GPIO15/header pin 10 and is read from /dev/serial0 at 9600 8N1. The sensor RX/control input is driven from Pi GPIO25, matching All_inclusive_sensor_program/MB7389.cpp: LOW for 145 ms, then HIGH, wait 145 ms, then parse a fresh Rxxxx frame. The id remains maxbotix_depth so its cloud history stays continuous.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
@@ -61,6 +61,8 @@
       "samplesPerReading": 10,
       "params": {
         "device": "/dev/serial0",
+        "chip": "/dev/gpiochip0",
+        "triggerPin": 25,
         "totalLength": 48
       }
     },
