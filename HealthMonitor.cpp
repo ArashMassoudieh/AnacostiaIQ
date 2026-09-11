@@ -8,7 +8,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
-#include <QStandardPaths>
 #include <QStorageInfo>
 
 HealthMonitor::HealthMonitor(DatabaseWriter *writer, QObject *parent)
@@ -61,8 +60,8 @@ void HealthMonitor::evaluate()
     const QDateTime now = QDateTime::currentDateTime();
     Level overall = Healthy;
 
-    // Application heartbeat: if this record stops arriving, the portal can
-    // infer that the monitoring process or the whole station has stopped.
+    // If this heartbeat stops arriving, the portal can infer that the
+    // monitoring process, network path, or whole station has stopped.
     updateComponent("application", Healthy, "monitor_running", now);
 
     for (Sensor *sensor : m_sensors) {
@@ -80,8 +79,6 @@ void HealthMonitor::evaluate()
             reason = QString("%1_consecutive_failures")
                          .arg(sensor->consecutiveFailures());
         } else if (sensor->lastValidReading().isValid()) {
-            // A stale reading is judged relative to the configured poll interval
-            // so slow sensors are not incorrectly marked offline.
             const int base = qMax(1, sensor->pollIntervalSeconds());
             const qint64 age = sensor->lastValidReading().secsTo(now);
             if (age > qMax(60, base * 3)) {
@@ -122,7 +119,8 @@ void HealthMonitor::evaluate()
     if (storage.isValid() && storage.isReady()) {
         const qint64 available = storage.bytesAvailable();
         Level diskLevel = Healthy;
-        QString diskReason = QString("%1_mb_free").arg(available / (1024 * 1024));
+        const QString diskReason =
+            QString("%1_mb_free").arg(available / (1024 * 1024));
         if (available <= DISK_CRITICAL_BYTES)
             diskLevel = Critical;
         else if (available <= DISK_WARN_BYTES)
@@ -134,7 +132,7 @@ void HealthMonitor::evaluate()
     const double temp = cpuTemperatureC();
     if (temp >= 0.0) {
         Level cpuLevel = Healthy;
-        QString cpuReason = QString::number(temp, 'f', 1) + "C";
+        const QString cpuReason = QString::number(temp, 'f', 1) + "C";
         if (temp >= CPU_CRITICAL_C)
             cpuLevel = Critical;
         else if (temp >= CPU_WARN_C)
@@ -152,17 +150,19 @@ void HealthMonitor::updateComponent(const QString &id, Level level,
                                     const QDateTime &now)
 {
     ComponentState &state = m_states[id];
-    const bool changed = !state.initialized || state.level != level ||
-                         state.reason != reason;
+    // Only a LEVEL transition is an alert-worthy state change. Reasons such as
+    // queue depth, free disk space, CPU temperature, or stale age can change on
+    // every evaluation and must not create a self-amplifying telemetry stream.
+    const bool changed = !state.initialized || state.level != level;
 
     if (changed) {
         state.level = level;
-        state.reason = reason;
         state.changedAt = now;
         state.initialized = true;
         qInfo().noquote() << QString("Health %1: %2 (%3)")
                                  .arg(id, levelName(level), reason);
     }
+    state.reason = reason;
 
     publishIfNeeded(id, state, now, changed);
 }
@@ -179,8 +179,6 @@ void HealthMonitor::publishIfNeeded(const QString &id, ComponentState &state,
     if (!force && !heartbeatDue)
         return;
 
-    // Reuse the durable sensor queue. Health records survive network outages
-    // and are replayed when connectivity returns.
     m_writer->sendReading("health_" + id,
                           static_cast<int>(state.level), "state", now);
     state.lastPublishedAt = now;
@@ -230,6 +228,7 @@ double HealthMonitor::cpuTemperatureC()
         return -1.0;
 
     bool ok = false;
-    const double milliC = QString::fromLatin1(file.readAll()).trimmed().toDouble(&ok);
+    const double milliC =
+        QString::fromLatin1(file.readAll()).trimmed().toDouble(&ok);
     return ok ? milliC / 1000.0 : -1.0;
 }
