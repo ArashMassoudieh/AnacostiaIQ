@@ -11,7 +11,7 @@
 #include <QMap>
 
 HeadlessMonitor::HeadlessMonitor(const QString &configPath, QObject *parent)
-    : QObject(parent), m_configPath(configPath) {
+    : QObject(parent), m_configPath(configPath), healthMonitor(&dbWriter, this) {
 }
 
 HeadlessMonitor::~HeadlessMonitor() {
