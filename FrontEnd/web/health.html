@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AnacostiaIQ — System Health</title>
+<style>
+:root{color-scheme:dark;--bg:#15181d;--panel:#20242b;--border:#313741;--text:#e5e9ef;--muted:#8b98a7;--ok:#2ecc71;--deg:#f5a623;--off:#e74c3c;--crit:#ff1744;--unk:#78909c}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
+header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+header h1{margin:0;font-size:22px}.sub{color:var(--muted);font-size:13px}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,a.btn{background:#0d6efd;color:white;border:0;border-radius:7px;padding:9px 13px;text-decoration:none;font-weight:600;cursor:pointer}button.secondary,a.secondary{background:#2c323b}
+main{padding:18px;max-width:1400px;margin:auto}.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:16px}.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px}.card h3{margin:0 0 8px;font-size:13px;color:#b7c0ca}.big{font-size:25px;font-weight:800}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.pill{display:inline-block;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:800;text-transform:uppercase}.healthy{background:#173c28;color:#6ee7a2}.degraded{background:#4a3412;color:#ffc766}.offline{background:#4b2020;color:#ff8f8f}.critical{background:#5b1020;color:#ff7a97}.unknown{background:#26313a;color:#a9bac7}.reason,.seen{font-size:12px;color:var(--muted);margin-top:7px;word-break:break-word}.alarm{border-left:4px solid var(--off)}.alarm.critical-border{border-left-color:var(--crit)}#alarms{margin-top:16px}.empty{color:var(--muted);font-style:italic}.footer-note{margin-top:18px;color:var(--muted);font-size:12px}.api-bad{color:#ff8f8f}.api-ok{color:#6ee7a2}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>AnacostiaIQ System Health</h1><div class="sub">Field-station sensors, application, cloud path, queue, storage and CPU</div></div>
+  <div class="toolbar">
+    <a class="btn secondary" href="/SensorDashboard.html">Charts</a>
+    <button id="notifyBtn" class="secondary">Enable browser alerts</button>
+    <button id="refreshBtn">Refresh now</button>
+  </div>
+</header>
+<main>
+  <div class="summary">
+    <div class="card"><h3>OVERALL STATION</h3><div id="overall" class="big">UNKNOWN</div><div id="overallSeen" class="seen">No data yet</div></div>
+    <div class="card"><h3>APPLICATION HEARTBEAT</h3><div id="heartbeat" class="big">UNKNOWN</div><div id="heartbeatSeen" class="seen">No data yet</div></div>
+    <div class="card"><h3>API CONNECTION</h3><div id="apiState" class="big">CHECKING</div><div id="apiDetail" class="seen"></div></div>
+    <div class="card"><h3>LAST PORTAL REFRESH</h3><div id="lastRefresh" class="big">--</div><div class="seen">Auto-refresh every 15 s</div></div>
+  </div>
+  <div id="components" class="grid"></div>
+  <section id="alarms"><h2>Active alarms</h2><div id="alarmList" class="empty">No active alarms.</div></section>
+  <div class="footer-note">State codes: 0 healthy, 1 degraded, 2 offline, 3 critical. Missing application heartbeat for more than 10 minutes is treated as station offline. Browser notifications are transition-only and include recovery notifications.</div>
+</main>
+<script>
+const COMPONENTS=[
+ ['sensor_hcsr04_depth','HC-SR04 Depth'],['sensor_maxbotix_depth','MaxBotix / Standpipe Depth'],['sensor_moisture_sensor','Soil Moisture / ADC'],
+ ['application','Application'],['cloud','Cloud / API'],['upload_queue','Upload Queue'],['storage','Storage'],['cpu_temperature','CPU Temperature'],['overall','Overall Station']
+];
+const stateName=v=>['healthy','degraded','offline','critical'][Number(v)]||'unknown';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let apiBase='http://54.213.147.59:5000';
+let previous={}; let active={};
+function latestReading(payload){
+  const a=Array.isArray(payload)?payload:(payload&&Array.isArray(payload.readings)?payload.readings:[]);
+  if(!a.length)return null;
+  return a.map(x=>({value:Number(x.value),timestamp:x.timestamp||x.time||x.datetime||x.date})).filter(x=>Number.isFinite(x.value)&&x.timestamp).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))[0]||null;
+}
+async function loadConfig(){try{const r=await fetch('/config.json',{cache:'no-store'});if(r.ok){const j=await r.json();if(j.api_url)apiBase=j.api_url.replace(/\/$/,'');}}catch(e){}}
+async function fetchHealth(id){
+  const end=new Date(),start=new Date(end.getTime()-24*3600e3);const u=new URL(apiBase+'/sensor/health_'+id);
+  u.searchParams.set('start',start.toISOString());u.searchParams.set('end',end.toISOString());
+  const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return latestReading(await r.json());
+}
+function notifyTransition(id,label,state){
+  const old=previous[id]; if(old===undefined){previous[id]=state;return;} if(old===state)return; previous[id]=state;
+  if(Notification.permission!=='granted')return;
+  if(state==='healthy')new Notification('AnacostiaIQ recovered',{body:label+' returned to healthy.'});
+  else new Notification('AnacostiaIQ alarm',{body:label+' is '+state.toUpperCase()+'.'});
+}
+function renderCard(id,label,state,reason,ts){
+  if(id==='overall')return;
+  const div=document.createElement('div'); div.className='card '+((state==='offline'||state==='critical')?'alarm ':'')+(state==='critical'?'critical-border':'');
+  div.innerHTML=`<div class="row"><h3>${esc(label)}</h3><span class="pill ${state}">${esc(state)}</span></div><div class="reason">${esc(reason||'health telemetry')}</div><div class="seen">Last seen: ${ts?new Date(ts).toLocaleString():'never'}</div>`;
+  document.getElementById('components').appendChild(div);
+}
+function setSummary(id,state,ts){
+  const e=document.getElementById(id==='overall'?'overall':'heartbeat'); const s=document.getElementById(id==='overall'?'overallSeen':'heartbeatSeen');
+  e.textContent=state.toUpperCase(); e.className='big '+state; s.textContent=ts?'Last health update: '+new Date(ts).toLocaleString():'No health data received';
+}
+async function refresh(){
+  const container=document.getElementById('components');container.innerHTML='';active={};let apiOk=true,apiErr='';
+  const results=await Promise.all(COMPONENTS.map(async([id,label])=>{try{return{id,label,r:await fetchHealth(id)}}catch(e){apiOk=false;apiErr=e.message;return{id,label,r:null}}}));
+  for(const {id,label,r} of results){
+    let state=r?stateName(r.value):'unknown', reason='health_'+id, ts=r?.timestamp||null;
+    if(id==='application'){
+      const age=ts?(Date.now()-new Date(ts).getTime())/1000:Infinity;
+      if(age>600){state='offline';reason='missing/stale application heartbeat';}
+      setSummary('application',state,ts);
+    }
+    if(id==='overall')setSummary('overall',state,ts);
+    renderCard(id,label,state,reason,ts);
+    notifyTransition(id,label,state);
+    if(state==='degraded'||state==='offline'||state==='critical')active[id]={label,state,ts};
+  }
+  const api=document.getElementById('apiState'),detail=document.getElementById('apiDetail'); api.textContent=apiOk?'REACHABLE':'UNREACHABLE';api.className='big '+(apiOk?'api-ok':'api-bad');detail.textContent=apiOk?apiBase:(apiErr||'Request failed');
+  const alarms=document.getElementById('alarmList'); const vals=Object.values(active); alarms.className=vals.length?'':'empty'; alarms.innerHTML=vals.length?vals.map(a=>`<div class="card alarm ${a.state==='critical'?'critical-border':''}"><b>${esc(a.label)}</b> — ${esc(a.state.toUpperCase())}<div class="seen">${a.ts?new Date(a.ts).toLocaleString():'No recent health sample'}</div></div>`).join(''):'No active alarms.';
+  document.getElementById('lastRefresh').textContent=new Date().toLocaleTimeString();
+}
+document.getElementById('notifyBtn').onclick=async()=>{if(!('Notification'in window))return alert('Browser notifications are not supported here.');const p=await Notification.requestPermission();document.getElementById('notifyBtn').textContent=p==='granted'?'Browser alerts enabled':'Browser alerts blocked';};
+document.getElementById('refreshBtn').onclick=refresh;
+(async()=>{await loadConfig();await refresh();setInterval(refresh,15000);})();
+</script>
+</body>
+</html>
