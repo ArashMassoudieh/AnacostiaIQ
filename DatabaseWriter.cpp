@@ -14,8 +14,6 @@ DatabaseWriter::DatabaseWriter(QObject *parent)
     : QObject(parent)
 {
     manager = new QNetworkAccessManager(this);
-
-    // API endpoint - UPDATE THIS TO YOUR EC2 IP
     apiUrl = QUrl("http://54.213.147.59:5000/sensor");
 
     queuePath = resolveQueuePath();
@@ -123,9 +121,6 @@ bool DatabaseWriter::rewriteQueueFile()
     return true;
 }
 
-// Send a single reading to the API. Every record is persisted BEFORE network
-// delivery is attempted. This gives at-least-once delivery across Internet
-// outages, API outages, process crashes, and normal Pi reboots.
 void DatabaseWriter::sendReading(const QString &sensorId, double value,
                                  const QString &unit, const QDateTime &timestamp)
 {
@@ -134,13 +129,11 @@ void DatabaseWriter::sendReading(const QString &sensorId, double value,
     json["value"] = QString::number(value, 'f', 2).toDouble();
     json["unit"] = unit;
 
-    if (timestamp.isValid()) {
+    if (timestamp.isValid())
         json["timestamp"] = timestamp.toString(Qt::ISODate);
-    } else {
+    else
         json["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    }
 
-    // Do not claim the reading is safely queued unless the disk append worked.
     if (!appendToQueueFile(json))
         return;
 
@@ -150,7 +143,6 @@ void DatabaseWriter::sendReading(const QString &sensorId, double value,
         QTimer::singleShot(0, this, &DatabaseWriter::trySendNext);
 }
 
-// Weather forecasts: queue every point through the same durable delivery path.
 void DatabaseWriter::sendWeatherData(const QString &sensorId, const QString &unit,
                                      const QVector<WeatherData> &weatherData)
 {
@@ -181,6 +173,7 @@ void DatabaseWriter::trySendNext()
     if (!apiUrl.isValid() || apiUrl.isEmpty()) {
         qWarning() << "Invalid API URL; keeping" << pending.size()
                    << "reading(s) queued locally";
+        lastFailureAt = QDateTime::currentDateTime();
         scheduleRetry();
         return;
     }
@@ -223,10 +216,6 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
         if (!pending.isEmpty())
             pending.removeFirst();
 
-        // Atomically persist removal of the delivered record. If the process
-        // dies after the server accepted a record but before this commit, the
-        // record may be delivered again after restart (at-least-once semantics),
-        // which is preferable to silently losing field measurements.
         rewriteQueueFile();
 
         if (failCount > 0)
@@ -234,6 +223,7 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
                     << pending.size() << "queued reading(s)";
 
         failCount = 0;
+        lastSuccessAt = QDateTime::currentDateTime();
         retryDelayMs = INITIAL_RETRY_MS;
         retryTimer.stop();
 
@@ -245,6 +235,7 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
     }
 
     ++failCount;
+    lastFailureAt = QDateTime::currentDateTime();
     if (failCount <= 3) {
         qWarning() << "DB write failed; reading retained locally:"
                    << reply->errorString()
