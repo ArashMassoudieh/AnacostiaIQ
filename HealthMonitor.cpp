@@ -106,17 +106,29 @@ void HealthMonitor::evaluate()
             }
         }
 
-        // A moisture value exactly at a calibration rail can be real, but if
-        // it stays bit-for-bit unchanged for several complete readings it is
-        // suspicious enough to flag as degraded for field inspection.
-        if (level == Healthy &&
+        // Explicit physical-disconnect detection for configured moisture/ADC
+        // probes. With this hardware, an absent/open probe can still produce a
+        // syntactically valid ADC rail value which maps to exactly 0 or 100 %.
+        // Do not treat that as healthy just because the ADC transaction worked:
+        // one/two consecutive rail readings are suspicious (DEGRADED), while
+        // three or more indicate a likely disconnected/open sensor (OFFLINE).
+        // A real non-rail measurement immediately starts recovery validation
+        // through the normal Sensor success logic above.
+        if ((level == Healthy || level == Degraded) &&
             sensor->id().contains("moisture", Qt::CaseInsensitive) &&
             sensor->hasLastValue() &&
-            (sensor->lastValue() <= 0.01 || sensor->lastValue() >= 99.99) &&
-            sensor->identicalValidReadings() >= 5) {
-            level = Degraded;
-            reason = QString("stuck_at_boundary_%1")
-                         .arg(sensor->lastValue(), 0, 'f', 2);
+            (sensor->lastValue() <= 0.01 || sensor->lastValue() >= 99.99)) {
+            const int rails = sensor->identicalValidReadings();
+            if (rails >= 3) {
+                level = Offline;
+                reason = QString("sensor_disconnected_boundary_%1")
+                             .arg(sensor->lastValue(), 0, 'f', 2);
+            } else if (rails >= 1) {
+                level = Degraded;
+                reason = QString("suspect_boundary_%1_%2_of_3")
+                             .arg(sensor->lastValue(), 0, 'f', 2)
+                             .arg(rails);
+            }
         }
 
         updateComponent("sensor_" + sensor->id(), level, reason, now);
