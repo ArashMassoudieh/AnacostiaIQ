@@ -10,14 +10,33 @@ if [[ ! -f "$HEALTH_FILE" ]]; then
   exit 2
 fi
 
-if command -v jq >/dev/null 2>&1; then
-  jq -r '
-    "AnacostiaIQ health @ " + (.timestamp // "unknown"),
-    "",
-    (.components | to_entries[] |
-      (.key | gsub("_"; " ")) as $name |
-      ($name + "\t" + ((.value.status // "unknown") | ascii_upcase) + "\t" + (.value.reason // "")))
-  ' "$HEALTH_FILE" | column -t -s $'\t' 2>/dev/null || cat "$HEALTH_FILE"
-else
-  cat "$HEALTH_FILE"
-fi
+python3 - "$HEALTH_FILE" <<'PY'
+import json, sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+try:
+    data = json.loads(p.read_text())
+except Exception as e:
+    print(f"Could not read health snapshot: {e}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"AnacostiaIQ health @ {data.get('timestamp', 'unknown')}")
+print()
+components = data.get('components', {})
+rows = []
+for key, value in components.items():
+    name = key.replace('_', ' ')
+    status = str(value.get('status', 'unknown')).upper()
+    reason = str(value.get('reason', ''))
+    rows.append((name, status, reason))
+
+if not rows:
+    print("No health components found.")
+    sys.exit(0)
+
+w1 = max(len(r[0]) for r in rows)
+w2 = max(len(r[1]) for r in rows)
+for name, status, reason in rows:
+    print(f"{name:<{w1}}  {status:<{w2}}  {reason}")
+PY
