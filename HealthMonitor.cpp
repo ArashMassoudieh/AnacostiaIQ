@@ -73,9 +73,20 @@ void HealthMonitor::evaluate()
             level = Offline;
             reason = "sensor_unavailable";
         } else if (sensor->recoveryPending()) {
-            level = Degraded;
-            reason = QString("recovery_validation_%1_of_2")
-                         .arg(sensor->recoverySuccesses());
+            // Reopening the descriptor/GPIO after an offline failure is not a
+            // recovery. Keep the alarm OFFLINE until real data return. One
+            // successful reading is enough to show progress as DEGRADED; two
+            // consecutive successful readings clear recoveryPending and allow
+            // the normal HEALTHY state. This prevents offline/degraded alarm
+            // flapping every time a dead sensor is periodically reinitialized.
+            if (sensor->recoverySuccesses() == 0) {
+                level = Offline;
+                reason = "recovery_validation_0_of_2";
+            } else {
+                level = Degraded;
+                reason = QString("recovery_validation_%1_of_2")
+                             .arg(sensor->recoverySuccesses());
+            }
         } else if (sensor->consecutiveFailures() >= 2) {
             level = Degraded;
             reason = QString("%1_consecutive_failures")
