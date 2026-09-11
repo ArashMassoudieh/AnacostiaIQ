@@ -60,8 +60,6 @@ void HealthMonitor::evaluate()
     const QDateTime now = QDateTime::currentDateTime();
     Level overall = Healthy;
 
-    // If this heartbeat stops arriving, the portal can infer that the
-    // monitoring process, network path, or whole station has stopped.
     updateComponent("application", Healthy, "monitor_running", now);
 
     for (Sensor *sensor : m_sensors) {
@@ -74,6 +72,10 @@ void HealthMonitor::evaluate()
         if (!sensor->isAvailable()) {
             level = Offline;
             reason = "sensor_unavailable";
+        } else if (sensor->recoveryPending()) {
+            level = Degraded;
+            reason = QString("recovery_validation_%1_of_2")
+                         .arg(sensor->recoverySuccesses());
         } else if (sensor->consecutiveFailures() >= 2) {
             level = Degraded;
             reason = QString("%1_consecutive_failures")
@@ -85,6 +87,19 @@ void HealthMonitor::evaluate()
                 level = Offline;
                 reason = QString("stale_%1s").arg(age);
             }
+        }
+
+        // A moisture value exactly at a calibration rail can be real, but if
+        // it stays bit-for-bit unchanged for several complete readings it is
+        // suspicious enough to flag as degraded for field inspection.
+        if (level == Healthy &&
+            sensor->id().contains("moisture", Qt::CaseInsensitive) &&
+            sensor->hasLastValue() &&
+            (sensor->lastValue() <= 0.01 || sensor->lastValue() >= 99.99) &&
+            sensor->identicalValidReadings() >= 5) {
+            level = Degraded;
+            reason = QString("stuck_at_boundary_%1")
+                         .arg(sensor->lastValue(), 0, 'f', 2);
         }
 
         updateComponent("sensor_" + sensor->id(), level, reason, now);
@@ -150,9 +165,8 @@ void HealthMonitor::updateComponent(const QString &id, Level level,
                                     const QDateTime &now)
 {
     ComponentState &state = m_states[id];
-    // Only a LEVEL transition is an alert-worthy state change. Reasons such as
-    // queue depth, free disk space, CPU temperature, or stale age can change on
-    // every evaluation and must not create a self-amplifying telemetry stream.
+    // Only a LEVEL transition is alarm-worthy. Reasons such as queue depth,
+    // free space, temperature, and stale age can change every evaluation.
     const bool changed = !state.initialized || state.level != level;
 
     if (changed) {
@@ -173,8 +187,13 @@ void HealthMonitor::publishIfNeeded(const QString &id, ComponentState &state,
     if (!m_writer)
         return;
 
-    const bool heartbeatDue = !state.lastPublishedAt.isValid() ||
-        state.lastPublishedAt.secsTo(now) >= m_heartbeatSeconds;
+    // Component telemetry is transition-only. Only application and overall
+    // station state need a periodic heartbeat for remote liveness detection.
+    // This keeps health monitoring from amplifying an existing offline queue.
+    const bool heartbeatComponent = (id == "application" || id == "overall");
+    const bool heartbeatDue = heartbeatComponent &&
+        (!state.lastPublishedAt.isValid() ||
+         state.lastPublishedAt.secsTo(now) >= m_heartbeatSeconds);
 
     if (!force && !heartbeatDue)
         return;
