@@ -80,7 +80,13 @@ void HealthMonitor::evaluate()
             level = Degraded;
             reason = QString("%1_consecutive_failures")
                          .arg(sensor->consecutiveFailures());
-        } else if (sensor->lastValidReading().isValid()) {
+        } else if (!sensor->lastValidReading().isValid()) {
+            // Opening a GPIO/UART/ADC successfully does not prove the physical
+            // sensor or its wire is healthy. Stay degraded until the first real
+            // valid reading arrives.
+            level = Degraded;
+            reason = "awaiting_first_valid_reading";
+        } else {
             const int base = qMax(1, sensor->pollIntervalSeconds());
             const qint64 age = sensor->lastValidReading().secsTo(now);
             if (age > qMax(60, base * 3)) {
