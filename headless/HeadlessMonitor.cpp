@@ -1,11 +1,5 @@
 /////////////////////////////////////////////////////////////
 // HEADLESSMONITOR.CPP - Sensor + weather monitoring, no GUI
-//
-//  Mirrors the polling behaviour of AnacostiaIQ (anacostiaiq.cpp)
-//  with the dashboard removed. Keep the two in step: the adaptive
-//  rule in particular is a correctness property, not a display
-//  detail — we slow the sensors down only when we positively know
-//  it's dry.
 /////////////////////////////////////////////////////////////
 
 #include "HeadlessMonitor.h"
@@ -17,16 +11,12 @@
 #include <QMap>
 
 HeadlessMonitor::HeadlessMonitor(const QString &configPath, QObject *parent)
-    : QObject(parent), m_configPath(configPath) {
+    : QObject(parent), m_configPath(configPath), healthMonitor(&dbWriter, this) {
 }
 
 HeadlessMonitor::~HeadlessMonitor() {
     shutdown();
 }
-
-// ================================================================
-//  Startup
-// ================================================================
 
 bool HeadlessMonitor::start() {
     if (!config.load(m_configPath)) {
@@ -41,8 +31,6 @@ bool HeadlessMonitor::start() {
     if (sensors.isEmpty())
         qWarning() << "No sensors configured — weather polling only";
 
-    // Bring each sensor up. A missing sensor is not fatal: the others
-    // keep reporting, and this one is simply skipped every tick.
     int up = 0;
     for (Sensor *s : sensors) {
         if (s->initialize()) {
@@ -61,12 +49,15 @@ bool HeadlessMonitor::start() {
     qInfo().noquote() << QString("%1 of %2 sensor(s) available")
                              .arg(up).arg(sensors.size());
 
+    healthMonitor.setSensors(sensors);
+    healthMonitor.start();
+
     startPolling();
     return true;
 }
 
 void HeadlessMonitor::loadConfiguration() {
-    pollInterval    = config.pollIntervalSeconds();
+    pollInterval     = config.pollIntervalSeconds();
     weatherInterval = config.weatherIntervalSeconds();
     dbWriter.setApiUrl(config.apiUrl());
 
@@ -86,7 +77,6 @@ void HeadlessMonitor::loadConfiguration() {
 }
 
 void HeadlessMonitor::registerSensors() {
-    // Same factory the GUI uses: config.json fully drives what exists.
     sensors = config.createSensors(this);
 }
 
@@ -96,45 +86,32 @@ void HeadlessMonitor::startPolling() {
         connect(t, &QTimer::timeout, this, [this, s]() { pollSensor(s); });
         t->start(effectiveIntervalSeconds(s) * 1000);
         sensorTimers.insert(s, t);
-
-        // First reading immediately, so the log shows life at startup
-        // rather than after a full interval.
         QTimer::singleShot(0, this, [this, s]() { pollSensor(s); });
     }
 
-    // Weather on its own interval, never scaled: this poll is what
-    // notices rain returning and pulls us back to high frequency.
     weatherTimer = new QTimer(this);
     connect(weatherTimer, &QTimer::timeout, this, &HeadlessMonitor::pollWeather);
     weatherTimer->start(weatherInterval * 1000);
     QTimer::singleShot(0, this, &HeadlessMonitor::pollWeather);
 }
 
-// ================================================================
-//  Shutdown
-// ================================================================
-
 void HeadlessMonitor::shutdown() {
     if (m_stopped)
         return;
     m_stopped = true;
+
+    healthMonitor.stop();
 
     for (auto it = sensorTimers.cbegin(); it != sensorTimers.cend(); ++it)
         it.value()->stop();
     if (weatherTimer)
         weatherTimer->stop();
 
-    // Hand the GPIO lines back to the kernel so a restart can claim
-    // them again — libgpiod holds them exclusively.
     for (Sensor *s : sensors)
         s->cleanup();
 
     qInfo() << "Monitor stopped; hardware released";
 }
-
-// ================================================================
-//  Adaptive polling
-// ================================================================
 
 int HeadlessMonitor::effectiveIntervalSeconds(Sensor *s) const {
     const int base = (s->pollIntervalSeconds() > 0)
@@ -144,8 +121,6 @@ int HeadlessMonitor::effectiveIntervalSeconds(Sensor *s) const {
     if (!adaptiveEnabled || !lowFrequency)
         return base;
 
-    // Clamped to a day so a large idleFactor can't overflow the
-    // millisecond int QTimer::start() takes.
     static const int MAX_INTERVAL_SEC = 24 * 3600;
     const qint64 scaled = static_cast<qint64>(base) * idleFactor;
     return static_cast<int>(qMin<qint64>(scaled, MAX_INTERVAL_SEC));
@@ -164,21 +139,20 @@ void HeadlessMonitor::setLowFrequencyMode(bool low) {
             << "— sensor intervals x" << (low ? idleFactor : 1);
 }
 
-// ================================================================
-//  Polling
-// ================================================================
-
 void HeadlessMonitor::pollSensor(Sensor *s) {
     if (!s || m_stopped)
         return;
-    if (!s->isAvailable())
-        return;   // reported at startup; don't repeat it every tick
+    if (!s->isAvailable()) {
+        healthMonitor.evaluateNow();
+        return;
+    }
 
-    const double value = s->takeReading();   // averages samplesPerReading
+    const double value = s->takeReading();
 
     if (!Sensor::isValid(value)) {
         qWarning().noquote()
             << QString("%1: no valid reading").arg(s->displayName());
+        healthMonitor.evaluateNow();
         return;
     }
 
@@ -188,6 +162,7 @@ void HeadlessMonitor::pollSensor(Sensor *s) {
                              .arg(s->unit());
 
     dbWriter.sendReading(s->id(), value, s->unit());
+    healthMonitor.evaluateNow();
 }
 
 void HeadlessMonitor::pollWeather() {
@@ -201,6 +176,14 @@ void HeadlessMonitor::pollWeather() {
     const QVector<WeatherData> temp =
         fetcher.getWeatherPrediction(datatype::Temperature);
 
+    // A shutdown signal can arrive while a synchronous weather request is in
+    // progress. Do not append hundreds of forecast records after shutdown has
+    // already started.
+    if (m_stopped) {
+        qInfo() << "Weather result discarded because shutdown is in progress";
+        return;
+    }
+
     qInfo().noquote()
         << QString("Forecast: %1 precip, %2 probability, %3 temperature point(s)")
                .arg(rainAmount.size()).arg(rainProb.size()).arg(temp.size());
@@ -209,10 +192,8 @@ void HeadlessMonitor::pollWeather() {
     dbWriter.sendWeatherData("precip_prob",   "%",  rainProb);
     dbWriter.sendWeatherData("temperature",   "C",  temp);
 
-    // ── Re-evaluate the polling cadence ────────────────────
-    // A failed fetch or a stale forecast leaves us at base intervals:
-    // dropping the sampling rate exactly when we've lost visibility is
-    // the one outcome we can't accept.
+    healthMonitor.evaluateNow();
+
     if (!adaptiveEnabled)
         return;
 

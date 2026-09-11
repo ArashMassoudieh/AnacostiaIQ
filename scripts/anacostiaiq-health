@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+HEALTH_FILE="$STATE_HOME/anacostiaiq/health.json"
+
+if [[ ! -f "$HEALTH_FILE" ]]; then
+  echo "AnacostiaIQ health snapshot not found: $HEALTH_FILE" >&2
+  echo "Start the headless monitor first; it creates this file automatically." >&2
+  exit 2
+fi
+
+python3 - "$HEALTH_FILE" <<'PY'
+import json, sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+try:
+    data = json.loads(p.read_text())
+except Exception as e:
+    print(f"Could not read health snapshot: {e}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"AnacostiaIQ health @ {data.get('timestamp', 'unknown')}")
+print()
+components = data.get('components', {})
+rows = []
+for key, value in components.items():
+    name = key.replace('_', ' ')
+    status = str(value.get('status', 'unknown')).upper()
+    reason = str(value.get('reason', ''))
+    rows.append((name, status, reason))
+
+if not rows:
+    print("No health components found.")
+    sys.exit(0)
+
+w1 = max(len(r[0]) for r in rows)
+w2 = max(len(r[1]) for r in rows)
+for name, status, reason in rows:
+    print(f"{name:<{w1}}  {status:<{w2}}  {reason}")
+PY
