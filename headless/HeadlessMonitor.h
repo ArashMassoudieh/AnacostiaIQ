@@ -46,7 +46,7 @@ private:
     Config         config;
     DatabaseWriter dbWriter;
     WeatherFetcher fetcher;
-    HealthMonitor  healthMonitor{&dbWriter, this};
+    HealthMonitor  healthMonitor;
 
     QVector<Sensor *>         sensors;
     QHash<Sensor *, QTimer *> sensorTimers;
