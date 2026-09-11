@@ -176,6 +176,14 @@ void HeadlessMonitor::pollWeather() {
     const QVector<WeatherData> temp =
         fetcher.getWeatherPrediction(datatype::Temperature);
 
+    // A shutdown signal can arrive while a synchronous weather request is in
+    // progress. Do not append hundreds of forecast records after shutdown has
+    // already started.
+    if (m_stopped) {
+        qInfo() << "Weather result discarded because shutdown is in progress";
+        return;
+    }
+
     qInfo().noquote()
         << QString("Forecast: %1 precip, %2 probability, %3 temperature point(s)")
                .arg(rainAmount.size()).arg(rainProb.size()).arg(temp.size());
