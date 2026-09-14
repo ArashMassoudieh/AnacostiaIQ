@@ -34,9 +34,11 @@ SOURCES += \
     $$PWD/../RuntimeModeGuard.cpp \
     $$PWD/../Config.cpp \
     $$PWD/../AdcBus.cpp \
+    $$PWD/../Ads1115Bus.cpp \
     $$PWD/../RainPolicy.cpp \
     $$PWD/../DistanceSensor.cpp \
     $$PWD/../MoistureSensor.cpp \
+    $$PWD/../MoistureSensorI2C.cpp \
     $$PWD/../MaxbotixSensor.cpp \
     $$PWD/../WeatherFetcher.cpp \
     HeadlessMonitor.cpp \
@@ -49,9 +51,11 @@ HEADERS += \
     $$PWD/../Config.h \
     $$PWD/../Sensor.h \
     $$PWD/../AdcBus.h \
+    $$PWD/../Ads1115Bus.h \
     $$PWD/../RainPolicy.h \
     $$PWD/../DistanceSensor.h \
     $$PWD/../MoistureSensor.h \
+    $$PWD/../MoistureSensorI2C.h \
     $$PWD/../MaxbotixSensor.h \
     $$PWD/../WeatherFetcher.h \
     HeadlessMonitor.h

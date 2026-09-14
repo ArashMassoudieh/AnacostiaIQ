@@ -5,8 +5,10 @@
 #include "Config.h"
 #include "DistanceSensor.h"
 #include "MoistureSensor.h"
+#include "MoistureSensorI2C.h"
 #include "MaxbotixSensor.h"
 #include "AdcBus.h"
+#include "Ads1115Bus.h"
 
 #include <QFile>
 #include <QJsonDocument>
@@ -136,6 +138,39 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
             adcBus->addChannel(pin);
     }
 
+    // ── Shared ADS1115 bus (New Build moisture path) ───────
+    // Unlike AdcBus, channels don't need to be registered up front —
+    // each ADS1115 read is its own independent single-shot conversion,
+    // so the bus only needs to know it should exist at all. Skipped
+    // entirely when no "moisture_ads1115" sensor is configured.
+    std::shared_ptr<Ads1115Bus> ads1115Bus;
+    bool haveAds1115Sensor = false;
+    for (const QJsonValue &v : arr) {
+        if (v.toObject().value("type").toString() == "moisture_ads1115") {
+            haveAds1115Sensor = true;
+            break;
+        }
+    }
+
+    if (haveAds1115Sensor) {
+        const QJsonObject ads = root.value("ads1115").toObject();
+        // I2C address is conventionally written as a hex string
+        // ("0x48") in config.json; QJsonValue::toString + a base-0
+        // parse accepts that, "72", or "0110010" alike.
+        bool addrOk = false;
+        int address = ads.value("address").toString("0x48")
+                          .toInt(&addrOk, 0);
+        if (!addrOk)
+            address = 0x48;
+
+        ads1115Bus = std::make_shared<Ads1115Bus>(
+            ads.value("device").toString("/dev/i2c-1"),
+            address,
+            ads.value("fsVoltage").toDouble(4.096),
+            ads.value("dataRateSps").toInt(128),
+            ads.value("cacheMs").toInt(200));
+    }
+
     for (const QJsonValue &v : arr) {
         QJsonObject obj = v.toObject();
 
@@ -177,6 +212,17 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
 
             sensor = new MoistureSensor(id, unit, name, adcBus, dataPin,
                                         adcDry, adcWet);
+        }
+        else if (type == "moisture_ads1115") {
+            // Bus-level settings (device, address, gain, data rate) live
+            // in the "ads1115" block; an entry only names its channel
+            // and calibration — mirrors the "moisture"/"adc" split.
+            int channel = params.value("channel").toInt(-1);
+            int adcDry  = params.value("adcDry").toInt(-1);
+            int adcWet  = params.value("adcWet").toInt(-1);
+
+            sensor = new MoistureSensorI2C(id, unit, name, ads1115Bus,
+                                           channel, adcDry, adcWet);
         }
         else if (type == "maxbotix") {
             QString device     = params.value("device").toString("/dev/serial0");

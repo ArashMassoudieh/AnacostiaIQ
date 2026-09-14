@@ -27,9 +27,11 @@ SOURCES += \
     RuntimeModeGuard.cpp \
     Config.cpp \
     AdcBus.cpp \
+    Ads1115Bus.cpp \
     RainPolicy.cpp \
     DistanceSensor.cpp \
     MoistureSensor.cpp \
+    MoistureSensorI2C.cpp \
     MaxbotixSensor.cpp \
     chartcontainer.cpp \
     main.cpp \
@@ -43,9 +45,11 @@ HEADERS += \
     Config.h \
     Sensor.h \
     AdcBus.h \
+    Ads1115Bus.h \
     RainPolicy.h \
     DistanceSensor.h \
     MoistureSensor.h \
+    MoistureSensorI2C.h \
     MaxbotixSensor.h \
     chartcontainer.h \
     WeatherFetcher.h \
