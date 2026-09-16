@@ -1,13 +1,5 @@
 /////////////////////////////////////////////////////////////
 // MOISTURESENSOR.H - Soil moisture sensor (one ADC0804 channel)
-//
-//  A moisture probe is one channel on a shared AdcBus: an ADC0804
-//  whose byte is shifted out through a CD4014. The bus owns the
-//  GPIO lines (they're shared with the other converters); this class
-//  contributes only its data pin and its own dry/wet calibration.
-//
-//  Everything comes from config.json — the "adc" block describes the
-//  bus, each sensor entry names its dataPin, adcDry and adcWet.
 /////////////////////////////////////////////////////////////
 
 #ifndef MOISTURESENSOR_H
@@ -23,7 +15,7 @@ class MoistureSensor : public Sensor {
 public:
     MoistureSensor(const QString &id, const QString &unit, const QString &name,
                    std::shared_ptr<AdcBus> bus, int dataPin,
-                   int adcDry, int adcWet);
+                   int adcDry, int adcWet, bool rejectAdcRails = true);
     ~MoistureSensor() override;
 
     bool   initialize() override;
@@ -33,12 +25,17 @@ private:
     double rawToMoisturePercent(int raw) const;
 
     std::shared_ptr<AdcBus> m_bus;
-    int m_dataPin = -1;   // this probe's CD4014 Q8 line
-
-    // Raw ADC counts (0-255) for a probe in dry air and in water.
-    // Dry reads higher than wet, so adcDry > adcWet.
+    int m_dataPin = -1;
     int m_adcDry = 105;
     int m_adcWet = 32;
+
+    // A disconnected/floating CD4014 input is biased low by AdcBus, so
+    // an absent ADC/probe commonly shifts 0x00. 0xFF is the symmetric
+    // stuck-high rail. Rejecting both prevents either electrical fault
+    // from becoming a plausible 100%/0% moisture measurement. This is
+    // configurable because a future installation may intentionally use
+    // the full ADC rail as part of a calibrated measurement range.
+    bool m_rejectAdcRails = true;
 };
 
 #endif // MOISTURESENSOR_H
