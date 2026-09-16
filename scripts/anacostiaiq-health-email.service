@@ -1,0 +1,22 @@
+[Unit]
+Description=AnacostiaIQ Health Email Alarm Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/AnacostiaIQ/scripts/health_email_monitor.py
+EnvironmentFile=%h/.config/anacostiaiq/health-email.env
+Restart=on-failure
+RestartSec=15
+
+# Basic service hardening. The monitor only needs network access and its own
+# per-user state directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/anacostiaiq
+
+[Install]
+WantedBy=default.target
