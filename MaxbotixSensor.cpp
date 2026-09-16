@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
+#include <poll.h>
 #include <thread>
 #include <chrono>
 #endif
@@ -80,8 +81,14 @@ bool MaxbotixSensor::initialize() {
     tty.c_oflag = 0;
     tty.c_lflag = 0;
 
-    tty.c_cc[VMIN]  = 0;      // non-blocking-ish: return as data arrives
-    tty.c_cc[VTIME] = 1;      // 0.1s inter-byte timeout
+    // VMIN=1/VTIME=1 (blocking single-byte reads) rather than VMIN=0's
+    // "return every ~100ms even with nothing" mode — confirmed by a
+    // side-by-side test against Sean's reference program that the RP1
+    // UART on this Pi 5 reliably delivers bytes under the former and
+    // not the latter. The overall per-measure() timeout is enforced
+    // separately with poll() below rather than relying on VTIME.
+    tty.c_cc[VMIN]  = 1;
+    tty.c_cc[VTIME] = 1;
 
     if (tcsetattr(m_fd, TCSANOW, &tty) != 0) {
         qWarning() << "MaxbotixSensor: tcsetattr failed on" << m_device;
@@ -161,7 +168,9 @@ double MaxbotixSensor::measure() {
     // Parse the streaming "Rxxxx" frames. Unlike the test program's
     // infinite loop, we read at most until a valid 4-digit frame is
     // assembled or READ_TIMEOUT_MS elapses, so a stalled/disconnected
-    // sensor can't block the monitoring tick.
+    // sensor can't block the monitoring tick. The bound is enforced by
+    // poll() up front; the actual read() only ever runs once poll()
+    // says a byte is already waiting, so it returns immediately.
     enum State { WaitR, ReadDigits };
     State state = WaitR;
     QString digits;
@@ -169,11 +178,24 @@ double MaxbotixSensor::measure() {
     QElapsedTimer timer;
     timer.start();
 
-    while (timer.elapsed() < READ_TIMEOUT_MS) {
+    while (true) {
+        const int remaining = READ_TIMEOUT_MS - static_cast<int>(timer.elapsed());
+        if (remaining <= 0)
+            break;
+
+        struct pollfd pfd{};
+        pfd.fd = m_fd;
+        pfd.events = POLLIN;
+        const int pret = poll(&pfd, 1, remaining);
+        if (pret <= 0)
+            continue;   // timed out or interrupted; loop re-checks elapsed()
+        if (!(pfd.revents & POLLIN))
+            continue;
+
         char c;
         int n = read(m_fd, &c, 1);
         if (n <= 0)
-            continue;   // no byte this slice; VTIME handles pacing
+            continue;   // shouldn't happen once poll() says data is ready
 
         if (state == WaitR) {
             if (c == 'R') {
