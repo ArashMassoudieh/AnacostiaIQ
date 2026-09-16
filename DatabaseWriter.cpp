@@ -206,6 +206,24 @@ void DatabaseWriter::sendValveState(bool open)
     sendReading("valve_state", open ? 1.0 : 0.0, "bool");
 }
 
+bool DatabaseWriter::isPriorityRecord(const QJsonObject &json)
+{
+    return json.value("sensor_id").toString().startsWith("health_");
+}
+
+int DatabaseWriter::nextPendingIndex() const
+{
+    // Health/liveness telemetry must not be blocked by a backlog of forecasts
+    // or ordinary observations. Preserve FIFO ordering within the health class.
+    for (int i = 0; i < pending.size(); ++i) {
+        if (isPriorityRecord(pending.at(i)))
+            return i;
+    }
+
+    // With no health telemetry waiting, retain normal FIFO behavior.
+    return pending.isEmpty() ? -1 : 0;
+}
+
 void DatabaseWriter::trySendNext()
 {
     if (inFlight || pending.isEmpty())
@@ -219,12 +237,22 @@ void DatabaseWriter::trySendNext()
         return;
     }
 
+    const int index = nextPendingIndex();
+    if (index < 0 || index >= pending.size())
+        return;
+
+    const QJsonObject record = pending.at(index);
     const QByteArray data =
-        QJsonDocument(pending.first()).toJson(QJsonDocument::Compact);
+        QJsonDocument(record).toJson(QJsonDocument::Compact);
 
     QNetworkRequest request(apiUrl);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
+    // Track the exact payload rather than a list index. New readings can be
+    // appended while the HTTP request is in flight, and future queue behavior
+    // may change; acknowledging by payload guarantees that only the record
+    // actually accepted by the server is removed locally.
+    inFlightKey = queueRecordKey(record);
     inFlight = true;
     QNetworkReply *reply = manager->post(request, data);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -254,8 +282,21 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
         reply->error() == QNetworkReply::NoError && httpOk;
 
     if (success) {
-        if (!pending.isEmpty())
-            pending.removeFirst();
+        int acknowledgedIndex = -1;
+        for (int i = 0; i < pending.size(); ++i) {
+            if (queueRecordKey(pending.at(i)) == inFlightKey) {
+                acknowledgedIndex = i;
+                break;
+            }
+        }
+
+        if (acknowledgedIndex >= 0) {
+            pending.removeAt(acknowledgedIndex);
+        } else {
+            qWarning() << "Successful cloud write but in-flight record was not "
+                          "found in the persistent queue; retaining remaining data";
+        }
+        inFlightKey.clear();
 
         rewriteQueueFile();
 
@@ -275,6 +316,9 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
         return;
     }
 
+    // The failed record remains in pending. Clearing only the transient key
+    // allows the priority selector to choose it again on the scheduled retry.
+    inFlightKey.clear();
     ++failCount;
     lastFailureAt = QDateTime::currentDateTime();
     if (failCount <= 3) {
