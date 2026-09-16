@@ -1,7 +1,8 @@
 {
+  "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets. Each sensor (and weather) may set its own 'intervalSeconds'; omit it to use app.pollIntervalSeconds. Each sensor may also set 'samplesPerReading': one reported reading is then the mean of that many samples taken back to back (failed samples are dropped, and 60 ms separates consecutive ones). Omit it for 1, i.e. no averaging. Raising it lengthens the blocking read proportionally, so keep intervalSeconds well above samplesPerReading x the time one sample takes.",
   "station": {
     "id": "lab_station_01",
-    "name": "CUA Lab Pi"
+    "name": "CUA Lab Station"
   },
   "app": {
     "pollIntervalSeconds": 10,
@@ -9,12 +10,14 @@
     "apiUrl": "http://54.213.147.59:5000/sensor"
   },
   "adaptive": {
+    "_comment": "When no forecast point in the next 'lookaheadHours' exceeds 'rainProbabilityThreshold' percent, every sensor's intervalSeconds is multiplied by 'idleFactor' (low-frequency mode). Rain in the forecast restores the base intervals. The weather poll itself is never scaled — it's what notices rain returning. Set enabled=false to pin the base intervals, or idleFactor=1 for the same effect.",
     "enabled": true,
     "idleFactor": 10,
     "rainProbabilityThreshold": 0,
     "lookaheadHours": 24
   },
   "weather": {
+    "_comment": "source is 'openmeteo' or 'noaa'. Open-Meteo uses latitude/longitude and gives hourly values. NOAA uses noaaOffice + gridX/gridY (multi-hour bins). 'intervalSeconds' polls weather as a group; forecasts change slowly so a larger value is fine.",
     "intervalSeconds": 1800,
     "source": "openmeteo",
     "latitude": 38.98,
@@ -24,6 +27,7 @@
     "noaaGridY": 71
   },
   "adc": {
+    "_comment": "Shared ADC0804 + CD4014 bank, pinned to match All_inclusive_sensor_program/ADC.cpp — the version that currently reads correctly on the Pi. Every 'moisture' sensor is one channel on it: the control lines below are wired to all the converters at once, and each converter reports on its own 'dataPin'. NOTE on 'chip': the older Automated_Multi-ADC_sensing_1 test used /dev/gpiochip4, but the Pi 5 kernel renumbered the RP1 bank to /dev/gpiochip0 — if you see 'AdcBus: GPIO init failed' in the log, check this first with 'gpiodetect'. powerPin is -1 because neither working program drives a supply-enable line; the bank is fed from the 5V rail. wrHighUs is how long WR is held high to trigger a conversion and conversionDelayMs how long to wait after it drops before shifting the byte out (no INTR line is wired, so completion can't be sensed). pulseWidthUs/settleUs are the clock pulse width and the settle either side of the P/S load. These four values reproduce the working program's timing exactly; shrink them only if the readings stay stable. cacheMs reuses one conversion for channels read within that window; they were sampled simultaneously anyway.",
     "chip": "/dev/gpiochip0",
     "wrPin": 2,
     "psPin": 27,
@@ -37,6 +41,7 @@
   },
   "sensors": [
     {
+      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match.",
       "type": "distance",
       "id": "hcsr04_depth",
       "unit": "in",
@@ -51,6 +56,7 @@
       }
     },
     {
+      "_comment": "MB7389-100: read over UART, not bit-banged GPIO. Its pin-5 serial output goes to the Pi header UART RX (GPIO15, header pin 10). On this Pi 5, that UART is exposed as /dev/serial0 (-> ttyAMA10, the RP1 PL011) — NOT /dev/ttyAMA0, which on Pi 5 is a separate SoC-internal UART not wired to the header at all. The app reads it at 9600 8N1. The id is kept as maxbotix_depth so its history in the cloud DB stays continuous.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
@@ -63,6 +69,7 @@
       }
     },
     {
+      "_comment": "The only populated channel on the 'adc' bank — ADC #1, CD4014 Q8 on GPIO5. adcDry/adcWet are this probe's raw counts in dry air and in water. The test rig wires three more converters (GPIO 6, 13 and 19); to bring one online, copy this entry with a unique id and its dataPin, and calibrate adcDry/adcWet for that probe. Unlisted channels are never requested from the kernel, so those GPIOs stay free.",
       "id": "moisture_sensor",
       "type": "moisture",
       "unit": "%",
