@@ -11,21 +11,33 @@
 class DatabaseWriter;
 class Sensor;
 
-// Field-station health telemetry. Numeric state codes travel through the
-// existing /sensor API: 0 healthy, 1 degraded, 2 offline, 3 critical.
+// Field-station health telemetry.
+// Numeric state codes are deliberately simple so they can travel through the
+// existing /sensor API without requiring a server migration:
+//   0 = healthy, 1 = degraded, 2 = offline, 3 = critical.
+// A human-readable snapshot is also written locally to
+// ~/.local/state/anacostiaiq/health.json.
 class HealthMonitor : public QObject
 {
     Q_OBJECT
+
 public:
-    enum Level { Healthy = 0, Degraded = 1, Offline = 2, Critical = 3 };
+    enum Level {
+        Healthy  = 0,
+        Degraded = 1,
+        Offline  = 2,
+        Critical = 3
+    };
     Q_ENUM(Level)
 
     explicit HealthMonitor(DatabaseWriter *writer, QObject *parent = nullptr);
+
     void setSensors(const QVector<Sensor *> &sensors);
     void setStationIdentity(const QString &id, const QString &name = QString());
     void start(int intervalSeconds = 30, int heartbeatSeconds = 300);
     void stop();
     void evaluateNow();
+
     static QString levelName(Level level);
 
 private:
@@ -44,6 +56,7 @@ private:
                          const QDateTime &now, bool force = false);
     void writeSnapshot(const QDateTime &now);
     QString snapshotPath() const;
+
     static double cpuTemperatureC();
     static Level worst(Level a, Level b);
 
@@ -55,6 +68,7 @@ private:
     QString m_stationId = "station_01";
     QString m_stationName = "AnacostiaIQ Station";
 
+    // Conservative defaults for a Pi field station.
     static constexpr int QUEUE_WARN = 500;
     static constexpr int QUEUE_CRITICAL = 2000;
     static constexpr qint64 DISK_WARN_BYTES = 500LL * 1024LL * 1024LL;
