@@ -11,6 +11,7 @@ DOCROOT="${DASH_DOCROOT:-/home/ubuntu/dashboard}"
 SSH_PORT="${DASH_PORT:-22}"
 SRC="${DASH_HEALTH_SRC:-$SCRIPT_DIR/web/health.html}"
 INDEX_SRC="${DASH_INDEX_SRC:-$SCRIPT_DIR/web/index.html}"
+CONFIG_SRC="${DASH_CONFIG_SRC:-$SCRIPT_DIR/config.json}"
 PEM="${DASH_PEM:-}"
 
 usage(){
@@ -76,7 +77,8 @@ echo "    target : $TARGET:$DOCROOT"
 ssh "${SSH_OPTS[@]}" "$TARGET" "mkdir -p '$DOCROOT'"
 scp "${SCP_OPTS[@]}" -q "$SRC" "$TARGET:$DOCROOT/health.html"
 scp "${SCP_OPTS[@]}" -q "$INDEX_SRC" "$TARGET:$DOCROOT/index.html"
-ssh "${SSH_OPTS[@]}" "$TARGET" "chmod 644 '$DOCROOT/health.html' '$DOCROOT/index.html'"
+scp "${SCP_OPTS[@]}" -q "$CONFIG_SRC" "$TARGET:$DOCROOT/config.json"
+ssh "${SSH_OPTS[@]}" "$TARGET" "chmod 644 '$DOCROOT/health.html' '$DOCROOT/index.html' '$DOCROOT/config.json'"
 
 BASE="http://$REMOTE_HOST"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/health.html" || true)
