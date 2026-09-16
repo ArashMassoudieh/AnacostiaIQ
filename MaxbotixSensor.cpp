@@ -5,8 +5,14 @@
 //    5V  -> V+
 //    GND -> GND
 //    Pi UART RX <- sensor serial output (pin 5 on the sensor)
+//    Pi GPIO (triggerPin) -> sensor RX/control, if triggerPin >= 0
 //
 //  Serial framing: "Rxxxx\r", xxxx = range in millimetres, 9600 8N1.
+//
+//  Trigger protocol (when triggerPin is configured) matches Sean
+//  Morgenstern's proven reference implementation exactly: the line
+//  idles HIGH ("free-run"), and each reading pulls it LOW for 145ms
+//  then back HIGH for 145ms before the sensor transmits a frame.
 /////////////////////////////////////////////////////////////
 
 #include "MaxbotixSensor.h"
@@ -18,13 +24,17 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
+#include <thread>
+#include <chrono>
 #endif
 
 MaxbotixSensor::MaxbotixSensor(const QString &id, const QString &unit,
                                const QString &name, const QString &device,
-                               double totalLength)
+                               double totalLength, int triggerPin,
+                               const QString &chip)
     : Sensor(id, unit, name),
-      m_device(device), m_totalLength(totalLength) {
+      m_device(device), m_totalLength(totalLength),
+      m_triggerPin(triggerPin), m_chipPath(chip) {
 }
 
 MaxbotixSensor::~MaxbotixSensor() {
@@ -81,6 +91,33 @@ bool MaxbotixSensor::initialize() {
         return false;
     }
 
+    if (m_triggerPin >= 0) {
+        try {
+            m_chip = std::make_unique<gpiod::chip>(m_chipPath.toStdString());
+
+            m_triggerReq = std::make_unique<gpiod::line_request>(
+                m_chip->prepare_request()
+                    .set_consumer("anacostiaiq-mb7389-trigger")
+                    .add_line_settings(
+                        m_triggerPin,
+                        gpiod::line_settings().set_direction(
+                            gpiod::line::direction::OUTPUT))
+                    .do_request());
+
+            // Idle HIGH = free-run, matching the reference implementation.
+            m_triggerReq->set_value(m_triggerPin, gpiod::line::value::ACTIVE);
+        }
+        catch (const std::exception &e) {
+            qWarning() << "MaxbotixSensor: trigger GPIO init failed:" << e.what();
+            m_triggerReq.reset();
+            m_chip.reset();
+            close(m_fd);
+            m_fd = -1;
+            setAvailable(false);
+            return false;
+        }
+    }
+
     setAvailable(true);
     return true;
 #else
@@ -94,6 +131,8 @@ bool MaxbotixSensor::initialize() {
 
 void MaxbotixSensor::cleanup() {
 #ifdef RasPi
+    m_triggerReq.reset();
+    m_chip.reset();
     if (m_fd >= 0) {
         close(m_fd);
         m_fd = -1;
@@ -109,6 +148,15 @@ double MaxbotixSensor::measure() {
     // Drop whatever accumulated between ticks: the sensor streams
     // continuously, and a stale frame would report an old range.
     tcflush(m_fd, TCIFLUSH);
+
+    if (m_triggerReq) {
+        // Pull the line LOW then back HIGH to start a new measurement —
+        // the timing the sensor actually requires before it transmits.
+        m_triggerReq->set_value(m_triggerPin, gpiod::line::value::INACTIVE);
+        std::this_thread::sleep_for(std::chrono::milliseconds(TRIGGER_PULSE_MS));
+        m_triggerReq->set_value(m_triggerPin, gpiod::line::value::ACTIVE);
+        std::this_thread::sleep_for(std::chrono::milliseconds(TRIGGER_PULSE_MS));
+    }
 
     // Parse the streaming "Rxxxx" frames. Unlike the test program's
     // infinite loop, we read at most until a valid 4-digit frame is

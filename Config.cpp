@@ -227,7 +227,13 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
         else if (type == "maxbotix") {
             QString device     = params.value("device").toString("/dev/serial0");
             double  totalLength = params.value("totalLength").toDouble(0.0);
-            sensor = new MaxbotixSensor(id, unit, name, device, totalLength);
+            // triggerPin: RX/control GPIO the sensor needs pulsed before
+            // each reading. -1 (default) skips triggering for any unit
+            // that genuinely free-runs without one.
+            int     triggerPin = params.value("triggerPin").toInt(-1);
+            QString chip       = params.value("chip").toString("/dev/gpiochip0");
+            sensor = new MaxbotixSensor(id, unit, name, device, totalLength,
+                                        triggerPin, chip);
         }
         else {
             qWarning() << "Config: unknown sensor type" << type
