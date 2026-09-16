@@ -7,8 +7,20 @@
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
+#include <QSet>
 #include <QStandardPaths>
 #include <QVariant>
+
+namespace {
+QByteArray queueRecordKey(const QJsonObject &json)
+{
+    // Queue identity is the complete payload, not just sensor_id/timestamp.
+    // This suppresses identical forecast records fetched again after a restart
+    // while still allowing a provider to publish a revised value for the same
+    // forecast timestamp.
+    return QJsonDocument(json).toJson(QJsonDocument::Compact);
+}
+}
 
 DatabaseWriter::DatabaseWriter(QObject *parent)
     : QObject(parent)
@@ -61,6 +73,8 @@ void DatabaseWriter::loadQueue()
     }
 
     int badLines = 0;
+    int duplicateLines = 0;
+    QSet<QByteArray> seen;
     while (!f.atEnd()) {
         const QByteArray line = f.readLine().trimmed();
         if (line.isEmpty())
@@ -72,12 +86,30 @@ void DatabaseWriter::loadQueue()
             ++badLines;
             continue;
         }
-        pending.append(doc.object());
+
+        const QJsonObject json = doc.object();
+        const QByteArray key = queueRecordKey(json);
+        if (seen.contains(key)) {
+            ++duplicateLines;
+            continue;
+        }
+
+        seen.insert(key);
+        pending.append(json);
     }
+    f.close();
 
     if (badLines > 0)
         qWarning() << "Ignored" << badLines
                    << "corrupt upload-queue record(s)";
+
+    if (duplicateLines > 0) {
+        qInfo() << "Removed" << duplicateLines
+                << "duplicate persistent upload-queue record(s)";
+        // Compact the on-disk queue immediately so subsequent restarts see the
+        // same de-duplicated source of truth.
+        rewriteQueueFile();
+    }
 }
 
 bool DatabaseWriter::appendToQueueFile(const QJsonObject &json)
@@ -133,6 +165,15 @@ void DatabaseWriter::sendReading(const QString &sensorId, double value,
         json["timestamp"] = timestamp.toString(Qt::ISODate);
     else
         json["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+    const QByteArray key = queueRecordKey(json);
+    for (const QJsonObject &queued : pending) {
+        if (queueRecordKey(queued) == key) {
+            qInfo() << "Skipping duplicate queued reading for"
+                    << sensorId << json["timestamp"].toString();
+            return;
+        }
+    }
 
     if (!appendToQueueFile(json))
         return;
