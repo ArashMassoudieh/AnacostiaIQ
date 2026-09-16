@@ -22,6 +22,17 @@ void HealthMonitor::setSensors(const QVector<Sensor *> &sensors)
     m_sensors = sensors;
 }
 
+void HealthMonitor::setStationIdentity(const QString &id, const QString &name)
+{
+    QString clean = id.trimmed().toLower();
+    clean.replace('-', '_');
+    clean.replace(' ', '_');
+    if (!clean.isEmpty())
+        m_stationId = clean;
+    if (!name.trimmed().isEmpty())
+        m_stationName = name.trimmed();
+}
+
 void HealthMonitor::start(int intervalSeconds, int heartbeatSeconds)
 {
     m_heartbeatSeconds = qMax(30, heartbeatSeconds);
@@ -202,8 +213,8 @@ void HealthMonitor::updateComponent(const QString &id, Level level,
         state.level = level;
         state.changedAt = now;
         state.initialized = true;
-        qInfo().noquote() << QString("Health %1: %2 (%3)")
-                                 .arg(id, levelName(level), reason);
+        qInfo().noquote() << QString("Health %1/%2: %3 (%4)")
+                                 .arg(m_stationId, id, levelName(level), reason);
     }
     state.reason = reason;
 
@@ -227,7 +238,7 @@ void HealthMonitor::publishIfNeeded(const QString &id, ComponentState &state,
     if (!force && !heartbeatDue)
         return;
 
-    m_writer->sendReading("health_" + id,
+    m_writer->sendReading("health_" + m_stationId + "_" + id,
                           static_cast<int>(state.level), "state", now);
     state.lastPublishedAt = now;
 }
@@ -257,6 +268,8 @@ void HealthMonitor::writeSnapshot(const QDateTime &now)
 
     QJsonObject root;
     root["timestamp"] = now.toString(Qt::ISODate);
+    root["station_id"] = m_stationId;
+    root["station_name"] = m_stationName;
     root["components"] = components;
 
     QSaveFile file(snapshotPath());

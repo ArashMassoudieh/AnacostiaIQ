@@ -49,6 +49,7 @@ bool HeadlessMonitor::start() {
     qInfo().noquote() << QString("%1 of %2 sensor(s) available")
                              .arg(up).arg(sensors.size());
 
+    healthMonitor.setStationIdentity(config.stationId(), config.stationName());
     healthMonitor.setSensors(sensors);
     healthMonitor.start();
 
@@ -72,6 +73,7 @@ void HeadlessMonitor::loadConfiguration() {
                         config.noaaGridX(), config.noaaGridY());
 
     qInfo().noquote() << "Config loaded from" << m_configPath
+                      << "| station:" << config.stationId()
                       << "| weather source:" << config.weatherSource()
                       << "| API:" << config.apiUrl();
 }

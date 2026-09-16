@@ -33,6 +33,7 @@ public:
     explicit HealthMonitor(DatabaseWriter *writer, QObject *parent = nullptr);
 
     void setSensors(const QVector<Sensor *> &sensors);
+    void setStationIdentity(const QString &id, const QString &name = QString());
     void start(int intervalSeconds = 30, int heartbeatSeconds = 300);
     void stop();
     void evaluateNow();
@@ -64,6 +65,8 @@ private:
     QMap<QString, ComponentState> m_states;
     QTimer m_timer;
     int m_heartbeatSeconds = 300;
+    QString m_stationId = "station_01";
+    QString m_stationName = "AnacostiaIQ Station";
 
     // Conservative defaults for a Pi field station.
     static constexpr int QUEUE_WARN = 500;

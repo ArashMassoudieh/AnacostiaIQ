@@ -1,5 +1,9 @@
 {
   "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets. Each sensor (and weather) may set its own 'intervalSeconds'; omit it to use app.pollIntervalSeconds. Each sensor may also set 'samplesPerReading': one reported reading is then the mean of that many samples taken back to back (failed samples are dropped, and 60 ms separates consecutive ones). Omit it for 1, i.e. no averaging. Raising it lengthens the blocking read proportionally, so keep intervalSeconds well above samplesPerReading x the time one sample takes.",
+  "station": {
+    "id": "lab_station_01",
+    "name": "CUA Lab Station"
+  },
   "app": {
     "pollIntervalSeconds": 10,
     "barrelDepthCm": 137.16,
@@ -41,7 +45,7 @@
       "type": "distance",
       "id": "hcsr04_depth",
       "unit": "in",
-      "name": "HC-SR04 Depth",
+      "name": "Inflow Weir Head",
       "intervalSeconds": 5,
       "samplesPerReading": 10,
       "params": {
@@ -56,7 +60,7 @@
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
-      "name": "MB7389-100 Depth",
+      "name": "Ponding Depth",
       "intervalSeconds": 5,
       "samplesPerReading": 10,
       "params": {

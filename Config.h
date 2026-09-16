@@ -15,6 +15,8 @@
 
 #include <QString>
 #include <QVector>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include "Sensor.h"
 
 class Config {
@@ -30,6 +32,19 @@ public:
     int     pollIntervalSeconds() const { return m_pollInterval; }
     double  barrelDepthCm() const       { return m_barrelDepth; }
     QString apiUrl() const              { return m_apiUrl; }
+
+    // Stable station identity used to namespace remote health telemetry.
+    // Read from retained JSON so older configs remain valid.
+    QString stationId() const {
+        const QJsonObject station = QJsonDocument::fromJson(m_raw)
+                                        .object().value("station").toObject();
+        return station.value("id").toString("station_01");
+    }
+    QString stationName() const {
+        const QJsonObject station = QJsonDocument::fromJson(m_raw)
+                                        .object().value("station").toObject();
+        return station.value("name").toString("AnacostiaIQ Station");
+    }
 
     // ── Adaptive polling ───────────────────────────────────
     // When no rain is forecast within rainLookaheadHours, every
