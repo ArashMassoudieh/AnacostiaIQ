@@ -1,15 +1,6 @@
 /////////////////////////////////////////////////////////////
 // CONFIG.H - Loads config.json: app settings + sensor factory
-//
-//  Reads an external JSON file so sensors and app settings can be
-//  changed without recompiling. load() must be called (and checked)
-//  before the getters or createSensors() are used.
-//
-//  createSensors() is a factory: it reads the "sensors" array and
-//  constructs the matching Sensor subclass for each entry, so the
-//  JSON fully drives what the app instantiates.
 /////////////////////////////////////////////////////////////
-
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -20,69 +11,56 @@
 class Config {
 public:
     Config() = default;
-
-    // Load and parse the JSON file. Returns false on missing file or
-    // parse error; errorString() then explains why.
     bool load(const QString &path);
     QString errorString() const { return m_error; }
 
-    // ── App-level settings (with sensible defaults) ────────
-    int     pollIntervalSeconds() const { return m_pollInterval; }
-    double  barrelDepthCm() const       { return m_barrelDepth; }
-    QString apiUrl() const              { return m_apiUrl; }
+    int pollIntervalSeconds() const { return m_pollInterval; }
+    double barrelDepthCm() const { return m_barrelDepth; }
+    QString apiUrl() const { return m_apiUrl; }
 
-    // ── Adaptive polling ───────────────────────────────────
-    // When no rain is forecast within rainLookaheadHours, every
-    // sensor's interval is multiplied by idleIntervalFactor. The
-    // weather interval is deliberately never scaled — it's what
-    // detects rain coming back.
-    bool    adaptiveEnabled() const        { return m_adaptiveEnabled; }
-    int     idleIntervalFactor() const     { return m_idleFactor; }
-    double  rainProbabilityThreshold() const { return m_rainThreshold; }
-    int     rainLookaheadHours() const     { return m_lookaheadHours; }
+    // Stable station identity used to namespace remote health telemetry.
+    QString stationId() const { return m_stationId; }
+    QString stationName() const { return m_stationName; }
 
-    // ── Weather settings ───────────────────────────────────
-    // Weather is polled as a group on its own interval (defaults to
-    // app.pollIntervalSeconds if "weather.intervalSeconds" is absent).
-    int     weatherIntervalSeconds() const { return m_weatherInterval; }
-    QString weatherSource() const       { return m_weatherSource; }
-    double  latitude() const            { return m_lat; }
-    double  longitude() const           { return m_lon; }
-    QString noaaOffice() const          { return m_office; }
-    int     noaaGridX() const           { return m_gridX; }
-    int     noaaGridY() const           { return m_gridY; }
+    bool adaptiveEnabled() const { return m_adaptiveEnabled; }
+    int idleIntervalFactor() const { return m_idleFactor; }
+    double rainProbabilityThreshold() const { return m_rainThreshold; }
+    int rainLookaheadHours() const { return m_lookaheadHours; }
 
-    // ── Sensor factory ─────────────────────────────────────
-    // Builds one Sensor* per entry in the JSON "sensors" array.
-    // Unknown "type" values are skipped with a warning. Ownership
-    // of the returned pointers passes to the caller.
+    int weatherIntervalSeconds() const { return m_weatherInterval; }
+    QString weatherSource() const { return m_weatherSource; }
+    double latitude() const { return m_lat; }
+    double longitude() const { return m_lon; }
+    QString noaaOffice() const { return m_office; }
+    int noaaGridX() const { return m_gridX; }
+    int noaaGridY() const { return m_gridY; }
+
     QVector<Sensor*> createSensors(QObject *parent = nullptr) const;
 
 private:
-    // Parsed app settings (defaults match the original hardcoded values)
-    int     m_pollInterval = 3600;
-    double  m_barrelDepth  = 137.16;
-    QString m_apiUrl       = "http://54.213.147.59:5000/sensor";
+    int m_pollInterval = 3600;
+    double m_barrelDepth = 137.16;
+    QString m_apiUrl = "http://54.213.147.59:5000/sensor";
 
-    // Adaptive polling
-    bool    m_adaptiveEnabled = true;
-    int     m_idleFactor      = 10;
-    double  m_rainThreshold   = 0.0;    // % — above this counts as "rain"
-    int     m_lookaheadHours  = 24;
+    QString m_stationId = "station_01";
+    QString m_stationName = "AnacostiaIQ Station";
 
-    // Weather
-    int     m_weatherInterval = 3600;   // falls back to m_pollInterval on load
+    bool m_adaptiveEnabled = true;
+    int m_idleFactor = 10;
+    double m_rainThreshold = 0.0;
+    int m_lookaheadHours = 24;
+
+    int m_weatherInterval = 3600;
     QString m_weatherSource = "openmeteo";
-    double  m_lat           = 38.98;
-    double  m_lon           = -77.10;
-    QString m_office        = "LWX";
-    int     m_gridX         = 97;
-    int     m_gridY         = 71;
+    double m_lat = 38.98;
+    double m_lon = -77.10;
+    QString m_office = "LWX";
+    int m_gridX = 97;
+    int m_gridY = 71;
 
-    // Raw JSON kept so createSensors() can read the array on demand
     QByteArray m_raw;
-    QString    m_error;
-    bool       m_loaded = false;
+    QString m_error;
+    bool m_loaded = false;
 };
 
 #endif // CONFIG_H
