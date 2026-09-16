@@ -134,6 +134,35 @@ def send_email(subject: str, body: str) -> None:
 
 
 def main() -> int:
+    # One-shot SMTP test using the same configuration as real alarm delivery.
+    # It intentionally does not read or modify the persisted alert state.
+    if "--test-email" in sys.argv[1:]:
+        station_name = os.getenv(
+            "ANACOSTIAIQ_ALERT_STATION_NAME",
+            "John McCormack Field Station",
+        )
+        station_id = os.getenv(
+            "ANACOSTIAIQ_ALERT_STATION_ID",
+            "field_station_01",
+        )
+        location = os.getenv(
+            "ANACOSTIAIQ_ALERT_STATION_LOCATION",
+            "John McCormack Rd NE · Washington, DC",
+        )
+        subject = f"[AnacostiaIQ TEST] {station_name}: email alerts"
+        body = (
+            "AnacostiaIQ email alert test\n\n"
+            f"Station: {station_name}\n"
+            f"Station ID: {station_id}\n"
+            f"Location: {location}\n"
+            f"Test time: {datetime.now().isoformat(timespec='seconds')}\n\n"
+            "This is a test message. No health alarm was generated.\n\n"
+            "Health dashboard: http://54.213.147.59/health.html\n"
+        )
+        send_email(subject, body)
+        print("TEST EMAIL SENT", flush=True)
+        return 0
+
     api_base = os.getenv("ANACOSTIAIQ_API_URL", "http://54.213.147.59:5000")
     station_id = os.getenv("ANACOSTIAIQ_ALERT_STATION_ID", "field_station_01")
     station_name = os.getenv("ANACOSTIAIQ_ALERT_STATION_NAME", "John McCormack Field Station")
