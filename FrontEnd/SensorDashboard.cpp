@@ -1,649 +1,246 @@
 #include "SensorDashboard.h"
-#include <QLinearGradient>
-#include <QGraphicsDropShadowEffect>
+#include "ExpressionEvaluator.h"
 #include <QFont>
+#include <QPainter>
+#include <QPen>
+#include <QSet>
 #include <limits>
+#include <cmath>
 
 SensorDashboard::SensorDashboard(const QString &configPath, QWidget *parent)
     : QMainWindow(parent)
 {
     networkManager = new QNetworkAccessManager(this);
     pendingRequests = 0;
-
-    // ── Load configuration first; it drives sensors + display + globals.
-    // On desktop the file is read synchronously. In a WebAssembly build
-    // there is no local filesystem, so the file read fails — in that case
-    // we fetch config.json over HTTP (relative to the served page) and
-    // finish initialising once it arrives.
-    if (config.load(configPath)) {
-        qDebug() << "Config loaded from" << configPath;
-        finishInitialization();
-    } else {
-        qWarning() << "Local config not available (" << config.errorString()
-        << ") — attempting HTTP fetch of config.json";
-        fetchConfig();
-    }
+    if (config.load(configPath)) finishInitialization();
+    else fetchConfig();
 }
 
-// Fetch config.json over HTTP. Used when no local file is readable
-// (the WebAssembly case). The URL is relative to the document base, so
-// config.json must sit next to SensorDashboard.html on the web server.
+SensorDashboard::~SensorDashboard() {}
+
 void SensorDashboard::fetchConfig()
 {
-    // Relative URL → resolved against the page the .wasm was loaded from.
-    QUrl url("config.json");
-    QNetworkRequest request(url);
-
-    QNetworkReply *reply = networkManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        if (reply->error() == QNetworkReply::NoError) {
-            QByteArray data = reply->readAll();
-            if (config.loadFromData(data))
-                qDebug() << "Config loaded via HTTP fetch (config.json)";
-            else
-                qWarning() << "Fetched config.json invalid ("
-                           << config.errorString()
-                           << ") — using built-in defaults";
-        } else {
-            qWarning() << "Could not fetch config.json ("
-                       << reply->errorString()
-                       << ") — using built-in defaults";
-        }
+    QNetworkReply *reply = networkManager->get(QNetworkRequest(QUrl("config.json")));
+    connect(reply,&QNetworkReply::finished,this,[this,reply](){
+        if(reply->error()==QNetworkReply::NoError) {
+            if(!config.loadFromData(reply->readAll())) qWarning()<<config.errorString();
+        } else qWarning()<<"Could not fetch config.json:" << reply->errorString();
         reply->deleteLater();
         finishInitialization();
     });
 }
 
-// Everything that depends on the config being loaded. Called directly
-// after a synchronous desktop load, or from the HTTP-fetch callback in
-// the WebAssembly build. Either way, by the time this runs `config`
-// holds whatever was loaded (or the built-in defaults if loading failed).
 void SensorDashboard::finishInitialization()
 {
-    apiUrl             = config.apiUrl();
-    refreshIntervalSec = config.refreshIntervalSec();
+    apiUrl=config.apiUrl();
+    refreshIntervalSec=config.refreshIntervalSec();
+    sensorIds=config.visibleSensorIds();
+    fetchSensorIds=config.fetchableSensorIds();
 
-    // ── Seed the sensor list from config. If the config pinned an
-    //    explicit list, that's authoritative and we won't let the API
-    //    discovery overwrite it. If it didn't, we fall back to the old
-    //    default list and let GET /sensors refine it.
-    sensorIds = config.visibleSensorIds();
-    if (sensorIds.isEmpty()) {
-        sensorIds = QStringList()
-            << "precip_amount"
-            << "precip_prob"
-            << "temperature"
-            << "water_depth"
-            << "valve_state"
-            << "moisture_sensor";
+    if(sensorIds.isEmpty()) {
+        sensorIds=QStringList()<<"precip_amount"<<"precip_prob"<<"temperature"<<"water_depth"<<"valve_state"<<"moisture_sensor";
+        fetchSensorIds=sensorIds;
     }
 
-    // Auto-refresh timer (interval from config)
-    refreshTimer = new QTimer(this);
-    refreshTimer->setInterval(refreshIntervalSec * 1000);
-    connect(refreshTimer, &QTimer::timeout,
-            this, &SensorDashboard::onAutoRefreshTimeout);
-
-    // Countdown display timer
-    countdownTimer = new QTimer(this);
+    refreshTimer=new QTimer(this);
+    refreshTimer->setInterval(refreshIntervalSec*1000);
+    connect(refreshTimer,&QTimer::timeout,this,&SensorDashboard::onAutoRefreshTimeout);
+    countdownTimer=new QTimer(this);
     countdownTimer->setInterval(1000);
-    connect(countdownTimer, &QTimer::timeout, this, [this]() {
-        countdownSeconds--;
-        if (countdownSeconds >= 0)
-            countdownLabel->setText(QString("  %1s").arg(countdownSeconds));
-    });
-    countdownSeconds = refreshIntervalSec;
+    connect(countdownTimer,&QTimer::timeout,this,[this](){ if(--countdownSeconds>=0) countdownLabel->setText(QString("  %1s").arg(countdownSeconds)); });
+    countdownSeconds=refreshIntervalSec;
 
     setupUI();
-
-    // Auto-refresh on by default if the config asked for it.
-    if (config.autoRefreshDefault())
-        autoRefreshCheckBox->setChecked(true);
-
-    // Only ask the server for the sensor list when the config did NOT
-    // pin one — otherwise honour the configured selection exactly.
-    if (config.hasExplicitSensorList())
-        fetchAllSensors();
-    else
-        fetchSensorList();
+    if(config.autoRefreshDefault()) autoRefreshCheckBox->setChecked(true);
+    if(config.hasExplicitSensorList()) fetchAllSensors(); else fetchSensorList();
 }
-
-SensorDashboard::~SensorDashboard()
-{
-}
-
-// ================================================================
-//  UI
-// ================================================================
 
 void SensorDashboard::setupUI()
 {
     setWindowTitle(config.windowTitle());
-    resize(1200, 850);
-
-    // ── Global stylesheet (modern, flat) ───────────────────────
+    resize(1200,850);
     setStyleSheet(R"(
-        QMainWindow {
-            background-color: #1a1d23;
-        }
-        QGroupBox {
-            font-weight: bold;
-            font-size: 13px;
-            color: #b0bec5;
-            border: 1px solid #2d3139;
-            border-radius: 8px;
-            margin-top: 10px;
-            padding: 14px 10px 8px 10px;
-            background-color: #21252b;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            left: 16px;
-            padding: 0 8px;
-        }
-        QPushButton {
-            background-color: #0d6efd;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 7px 22px;
-            font-weight: bold;
-            font-size: 13px;
-        }
-        QPushButton:hover {
-            background-color: #3d8bfd;
-        }
-        QPushButton:pressed {
-            background-color: #0a58ca;
-        }
-        QDateTimeEdit {
-            background-color: #2b3038;
-            color: #e0e0e0;
-            border: 1px solid #3a3f47;
-            border-radius: 6px;
-            padding: 5px 10px;
-            font-size: 13px;
-        }
-        QDateTimeEdit::drop-down {
-            border: none;
-            width: 20px;
-        }
-        QLabel {
-            color: #90a4ae;
-            font-size: 13px;
-        }
-        QCheckBox {
-            color: #90a4ae;
-            font-size: 13px;
-            spacing: 6px;
-        }
-        QCheckBox::indicator {
-            width: 16px;
-            height: 16px;
-            border-radius: 3px;
-            border: 1px solid #4a5060;
-            background-color: #2b3038;
-        }
-        QCheckBox::indicator:checked {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-        QStatusBar {
-            background-color: #181b20;
-            color: #607d8b;
-            font-size: 12px;
-            border-top: 1px solid #2d3139;
-        }
-        QScrollArea {
-            background-color: transparent;
-            border: none;
-        }
-    )");
+QMainWindow{background-color:#1a1d23} QGroupBox{font-weight:bold;font-size:13px;color:#b0bec5;border:1px solid #2d3139;border-radius:8px;margin-top:10px;padding:14px 10px 8px 10px;background-color:#21252b}
+QGroupBox::title{subcontrol-origin:margin;left:16px;padding:0 8px} QPushButton{background-color:#0d6efd;color:white;border:none;border-radius:6px;padding:7px 22px;font-weight:bold;font-size:13px} QPushButton:hover{background-color:#3d8bfd}
+QDateTimeEdit{background-color:#2b3038;color:#e0e0e0;border:1px solid #3a3f47;border-radius:6px;padding:5px 10px;font-size:13px} QLabel,QCheckBox{color:#90a4ae;font-size:13px} QStatusBar{background-color:#181b20;color:#607d8b;font-size:12px;border-top:1px solid #2d3139} QScrollArea{background-color:transparent;border:none}
+)");
 
-    centralWidget = new QWidget(this);
-    mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setContentsMargins(16, 16, 16, 16);
-    mainLayout->setSpacing(10);
+    centralWidget=new QWidget(this);
+    mainLayout=new QVBoxLayout(centralWidget);
+    mainLayout->setContentsMargins(16,16,16,16); mainLayout->setSpacing(10);
+    controlGroup=new QGroupBox("Query Controls",this);
+    QHBoxLayout *row=new QHBoxLayout(controlGroup);
+    startLabel=new QLabel("From:",this); startDateTimeEdit=new QDateTimeEdit(this);
+    startDateTimeEdit->setDisplayFormat("yyyy-MM-dd HH:mm"); startDateTimeEdit->setCalendarPopup(true);
+    startDateTimeEdit->setDateTime(QDateTime::currentDateTime().addDays(-config.defaultRangeDaysBack()));
+    endLabel=new QLabel("To:",this); endDateTimeEdit=new QDateTimeEdit(this);
+    endDateTimeEdit->setDisplayFormat("yyyy-MM-dd HH:mm"); endDateTimeEdit->setCalendarPopup(true);
+    endDateTimeEdit->setDateTime(QDateTime::currentDateTime().addDays(config.defaultRangeDaysAhead()));
+    fetchButton=new QPushButton("Fetch Data",this);
+    autoRefreshCheckBox=new QCheckBox(QString("Auto-refresh (%1s)").arg(refreshIntervalSec),this);
+    countdownLabel=new QLabel("",this);
+    row->addWidget(startLabel); row->addWidget(startDateTimeEdit); row->addWidget(endLabel); row->addWidget(endDateTimeEdit); row->addWidget(fetchButton); row->addSpacing(24); row->addWidget(autoRefreshCheckBox); row->addWidget(countdownLabel); row->addStretch();
 
-    // === Control Panel ===
-    controlGroup = new QGroupBox("Query Controls", this);
-    QHBoxLayout *controlRow = new QHBoxLayout(controlGroup);
-    controlRow->setSpacing(10);
-
-    startLabel = new QLabel("From:", this);
-    startDateTimeEdit = new QDateTimeEdit(this);
-    startDateTimeEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
-    startDateTimeEdit->setCalendarPopup(true);
-    startDateTimeEdit->setDateTime(
-        QDateTime::currentDateTime().addDays(-config.defaultRangeDaysBack()));
-
-    endLabel = new QLabel("To:", this);
-    endDateTimeEdit = new QDateTimeEdit(this);
-    endDateTimeEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
-    endDateTimeEdit->setCalendarPopup(true);
-    endDateTimeEdit->setDateTime(
-        QDateTime::currentDateTime().addDays(config.defaultRangeDaysAhead()));
-
-    fetchButton = new QPushButton("Fetch Data", this);
-
-    autoRefreshCheckBox = new QCheckBox(
-        QString("Auto-refresh (%1s)").arg(refreshIntervalSec), this);
-
-    countdownLabel = new QLabel("", this);
-    countdownLabel->setStyleSheet("color: #546e7a; font-style: italic;");
-
-    controlRow->addWidget(startLabel);
-    controlRow->addWidget(startDateTimeEdit);
-    controlRow->addWidget(endLabel);
-    controlRow->addWidget(endDateTimeEdit);
-    controlRow->addWidget(fetchButton);
-    controlRow->addSpacing(24);
-    controlRow->addWidget(autoRefreshCheckBox);
-    controlRow->addWidget(countdownLabel);
-    controlRow->addStretch();
-
-    // === Charts Area ===
-    chartsContainer = new QWidget();
-    chartsContainer->setStyleSheet("background-color: transparent;");
-    chartsLayout = new QVBoxLayout(chartsContainer);
-    chartsLayout->setContentsMargins(0, 0, 0, 0);
-
-    // Layout mode is now a runtime config flag (scrollable_charts)
-    // rather than a compile-time #ifdef.
-    if (config.scrollableCharts()) {
-        chartsLayout->setSpacing(10);
-        scrollArea = new QScrollArea(this);
-        scrollArea->setWidgetResizable(true);
-        scrollArea->setFrameShape(QFrame::NoFrame);
-        scrollArea->setWidget(chartsContainer);
-
-        mainLayout->addWidget(controlGroup);
-        mainLayout->addWidget(scrollArea, 1);
-    } else {
-        chartsLayout->setSpacing(4);
-        mainLayout->addWidget(controlGroup);
-        mainLayout->addWidget(chartsContainer, 1);
-    }
-
+    chartsContainer=new QWidget(); chartsLayout=new QVBoxLayout(chartsContainer); chartsLayout->setContentsMargins(0,0,0,0);
+    if(config.scrollableCharts()) { scrollArea=new QScrollArea(this); scrollArea->setWidgetResizable(true); scrollArea->setWidget(chartsContainer); mainLayout->addWidget(controlGroup); mainLayout->addWidget(scrollArea,1); }
+    else { mainLayout->addWidget(controlGroup); mainLayout->addWidget(chartsContainer,1); }
     setCentralWidget(centralWidget);
-    statusBar()->showMessage(
-        QString("Ready — default range: -%1 / +%2 days")
-            .arg(config.defaultRangeDaysBack())
-            .arg(config.defaultRangeDaysAhead()));
-
-    // === Signals ===
-    connect(fetchButton, &QPushButton::clicked,
-            this, &SensorDashboard::onFetchClicked);
-    connect(autoRefreshCheckBox, &QCheckBox::toggled,
-            this, &SensorDashboard::onAutoRefreshToggled);
+    connect(fetchButton,&QPushButton::clicked,this,&SensorDashboard::onFetchClicked);
+    connect(autoRefreshCheckBox,&QCheckBox::toggled,this,&SensorDashboard::onAutoRefreshToggled);
+    setStatus("Ready");
 }
 
-// ================================================================
-//  Slots
-// ================================================================
-
-void SensorDashboard::onFetchClicked()
-{
-    fetchAllSensors();
-}
-
+void SensorDashboard::onFetchClicked(){ fetchAllSensors(); }
 void SensorDashboard::onAutoRefreshToggled(bool checked)
 {
-    if (checked) {
-        countdownSeconds = refreshIntervalSec;
-        countdownLabel->setText(QString("  %1s").arg(countdownSeconds));
-        refreshTimer->start();
-        countdownTimer->start();
-    } else {
-        refreshTimer->stop();
-        countdownTimer->stop();
-        countdownLabel->setText("");
-    }
+    if(checked){countdownSeconds=refreshIntervalSec;refreshTimer->start();countdownTimer->start();}
+    else{refreshTimer->stop();countdownTimer->stop();countdownLabel->clear();}
 }
-
-void SensorDashboard::onAutoRefreshTimeout()
-{
-    endDateTimeEdit->setDateTime(
-        QDateTime::currentDateTime().addDays(config.defaultRangeDaysAhead()));
-    fetchAllSensors();
-    countdownSeconds = refreshIntervalSec;
-}
-
-// ================================================================
-//  Network — sensor list
-// ================================================================
+void SensorDashboard::onAutoRefreshTimeout(){endDateTimeEdit->setDateTime(QDateTime::currentDateTime().addDays(config.defaultRangeDaysAhead()));fetchAllSensors();countdownSeconds=refreshIntervalSec;}
 
 void SensorDashboard::fetchSensorList()
 {
-    QUrl url(apiUrl + "/sensors");
-    QNetworkRequest request(url);
-
-    qDebug() << "Fetching sensor list from" << url.toString();
-
-    QNetworkReply *reply = networkManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        onSensorListReceived(reply);
-    });
+    QNetworkReply *reply=networkManager->get(QNetworkRequest(QUrl(apiUrl+"/sensors")));
+    connect(reply,&QNetworkReply::finished,this,[this,reply](){onSensorListReceived(reply);});
 }
 
 void SensorDashboard::onSensorListReceived(QNetworkReply *reply)
 {
-    if (reply->error() == QNetworkReply::NoError) {
-        QByteArray data = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-
-        if (doc.isArray()) {
-            QJsonArray arr = doc.array();
-            QStringList newIds;
-            for (const QJsonValue &v : arr)
-                newIds.append(v.toString());
-            if (!newIds.isEmpty()) {
-                sensorIds = newIds;
-                qDebug() << "Loaded sensors from API:" << sensorIds;
-            }
+    if(reply->error()==QNetworkReply::NoError) {
+        const QJsonDocument doc=QJsonDocument::fromJson(reply->readAll());
+        if(doc.isArray()) {
+            QStringList ids; for(const QJsonValue &v:doc.array()) ids.append(v.toString());
+            if(!ids.isEmpty()){ sensorIds=ids; fetchSensorIds=ids; }
         }
-    } else {
-        qDebug() << "Could not fetch sensor list, using defaults:"
-                 << reply->errorString();
     }
-
-    reply->deleteLater();
-    fetchAllSensors();
+    reply->deleteLater(); fetchAllSensors();
 }
-
-// ================================================================
-//  Network — sensor data
-// ================================================================
 
 void SensorDashboard::fetchAllSensors()
 {
-    pendingRequests = sensorIds.size();
-    setStatus(QString("Fetching data for %1 sensors...").arg(pendingRequests));
-
-    for (const QString &id : sensorIds)
-        fetchSensorData(id);
+    rawSeries.clear();
+    // Re-resolve physical ids each cycle because explicit config can contain
+    // derived charts interleaved with measured charts.
+    if(config.hasExplicitSensorList()) fetchSensorIds=config.fetchableSensorIds();
+    pendingRequests=fetchSensorIds.size();
+    setStatus(QString("Fetching %1 measured series...").arg(pendingRequests));
+    if(pendingRequests==0){evaluateDerivedSeries();return;}
+    for(const QString &id:fetchSensorIds) fetchSensorData(id);
 }
 
 void SensorDashboard::fetchSensorData(const QString &sensorId)
 {
-    QUrl url(apiUrl + "/sensor/" + sensorId);
-    QUrlQuery query;
-
-    QDateTime startDt = startDateTimeEdit->dateTime();
-    QDateTime endDt   = endDateTimeEdit->dateTime();
-
-    query.addQueryItem("start", startDt.toUTC().toString(Qt::ISODate));
-    query.addQueryItem("end",   endDt.toUTC().toString(Qt::ISODate));
-    url.setQuery(query);
-
-    QNetworkRequest request(url);
-
-    QNetworkReply *reply = networkManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, sensorId, reply]() {
-        onDataReceived(sensorId, reply);
-    });
+    QUrl url(apiUrl+"/sensor/"+sensorId); QUrlQuery q;
+    q.addQueryItem("start",startDateTimeEdit->dateTime().toUTC().toString(Qt::ISODate));
+    q.addQueryItem("end",endDateTimeEdit->dateTime().toUTC().toString(Qt::ISODate)); url.setQuery(q);
+    QNetworkReply *reply=networkManager->get(QNetworkRequest(url));
+    connect(reply,&QNetworkReply::finished,this,[this,sensorId,reply](){onDataReceived(sensorId,reply);});
 }
 
-void SensorDashboard::onDataReceived(const QString &sensorId,
-                                     QNetworkReply *reply)
+void SensorDashboard::onDataReceived(const QString &sensorId,QNetworkReply *reply)
 {
-    if (!reply) return;
-
-    if (reply->error() == QNetworkReply::NoError) {
-        QByteArray responseData = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(responseData);
-
-        QJsonArray dataArray;
-        if (doc.isArray()) {
-            dataArray = doc.array();
-        } else if (doc.isObject()) {
-            QJsonObject obj = doc.object();
-            if (obj.contains("readings"))
-                dataArray = obj["readings"].toArray();
-        }
-
-        updateChart(sensorId, dataArray);
-    } else {
-        qDebug() << "Error fetching" << sensorId << ":" << reply->errorString();
-        QJsonArray empty;
-        updateChart(sensorId, empty);
-    }
-
-    reply->deleteLater();
-
-    pendingRequests--;
-    if (pendingRequests <= 0) {
-        setStatus(QString("All sensors loaded — %1")
-                      .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
-    }
+    QJsonArray a;
+    if(reply && reply->error()==QNetworkReply::NoError) {
+        const QJsonDocument doc=QJsonDocument::fromJson(reply->readAll());
+        if(doc.isArray()) a=doc.array(); else if(doc.isObject()) a=doc.object().value("readings").toArray();
+    } else if(reply) qWarning()<<"Error fetching"<<sensorId<<reply->errorString();
+    rawSeries.insert(sensorId,a);
+    updateChart(sensorId,a);
+    if(reply) reply->deleteLater();
+    if(--pendingRequests<=0) evaluateDerivedSeries();
 }
 
-// ================================================================
-//  Chart management
-// ================================================================
-
-SensorChart &SensorDashboard::getOrCreateChart(const QString &sensorId)
+QJsonArray SensorDashboard::evaluateDerived(const SensorDef &def,QString *error) const
 {
-    if (!sensorCharts.contains(sensorId)) {
-        SensorChart sc;
+    QJsonArray out;
+    if(def.inputs.isEmpty() || def.expression.trimmed().isEmpty()) { if(error)*error="missing inputs/expression"; return out; }
 
-        // ── Chart ──────────────────────────────────────────────
-        sc.chart = new QChart();
-        sc.chart->setAnimationOptions(QChart::SeriesAnimations);
-        sc.chart->setBackgroundBrush(QBrush(QColor("#21252b")));
-        sc.chart->setBackgroundRoundness(10);
-        sc.chart->setMargins(QMargins(12, 8, 12, 4));
-        sc.chart->legend()->hide();
+    // v1 intentionally evaluates on one source timeline. The schema already
+    // supports multiple named inputs; timestamp alignment/resampling can be
+    // added here later without changing config or expression syntax.
+    if(def.inputs.size()!=1) { if(error)*error="multi-input derived series requires timestamp alignment (not implemented yet)"; return out; }
+    const QString var=def.inputs.firstKey();
+    const QString sourceId=def.inputs.value(var);
+    if(!rawSeries.contains(sourceId)) { if(error)*error=QString("source '%1' not loaded").arg(sourceId); return out; }
 
-        // Title
-        QFont titleFont;
-        titleFont.setPixelSize(14);
-        titleFont.setBold(true);
-        sc.chart->setTitleFont(titleFont);
-        sc.chart->setTitleBrush(QBrush(QColor("#cfd8dc")));
-        sc.chart->setTitle(friendlyName(sensorId));
+    for(const QJsonValue &rv:rawSeries.value(sourceId)) {
+        if(!rv.isObject()) continue;
+        const QJsonObject r=rv.toObject();
+        bool numeric=false; double sourceValue=0;
+        const QJsonValue vf=r.value("value");
+        if(vf.isDouble()){sourceValue=vf.toDouble();numeric=true;}
+        else if(vf.isString()) sourceValue=vf.toString().toDouble(&numeric);
+        if(!numeric) continue;
 
-        // ── Line series ────────────────────────────────────────
-        sc.series = new QLineSeries();
-        sc.series->setName(sensorId);
-        QPen linePen(seriesColor(sensorId));
-        linePen.setWidth(2);
-        sc.series->setPen(linePen);
-
-        // ── Area fill under curve ──────────────────────────────
-        QLineSeries *lower = new QLineSeries();   // stays at 0
-        sc.area = new QAreaSeries(sc.series, lower);
-        sc.area->setName(sensorId);
-
-        QColor fill = areaColor(sensorId);
-        sc.area->setBrush(QBrush(fill));
-        sc.area->setPen(linePen);           // top edge = line pen
-        QPen noPen(Qt::NoPen);
-        sc.area->setBorderColor(Qt::transparent);
-
-        sc.chart->addSeries(sc.area);
-
-        // ── X axis (time) ──────────────────────────────────────
-        sc.axisX = new QDateTimeAxis();
-        sc.axisX->setFormat("M/dd HH:mm");
-        sc.axisX->setLabelsAngle(0);
-        sc.axisX->setTickCount(5);
-        sc.axisX->setGridLineVisible(true);
-        sc.axisX->setGridLineColor(QColor("#2d3139"));
-        sc.axisX->setLinePenColor(QColor("#3a3f47"));
-        sc.axisX->setLabelsColor(QColor("#78909c"));
-        QFont axisFont;
-        axisFont.setPixelSize(10);
-        sc.axisX->setLabelsFont(axisFont);
-        sc.chart->addAxis(sc.axisX, Qt::AlignBottom);
-        sc.area->attachAxis(sc.axisX);
-
-        // ── Y axis (value) ─────────────────────────────────────
-        sc.axisY = new QValueAxis();
-        sc.axisY->setGridLineVisible(true);
-        sc.axisY->setGridLineColor(QColor("#2d3139"));
-        sc.axisY->setLinePenColor(QColor("#3a3f47"));
-        sc.axisY->setLabelsColor(QColor("#78909c"));
-        sc.axisY->setLabelsFont(axisFont);
-        sc.axisY->setTickCount(5);
-        sc.chart->addAxis(sc.axisY, Qt::AlignLeft);
-        sc.area->attachAxis(sc.axisY);
-
-        // ── Chart view ─────────────────────────────────────────
-        sc.chartView = new QChartView(sc.chart);
-        sc.chartView->setRenderHint(QPainter::Antialiasing);
-        sc.chartView->setStyleSheet(
-            "background-color: #21252b; border-radius: 10px;");
-
-        if (config.scrollableCharts()) {
-            sc.chartView->setMinimumHeight(280);
-            sc.chartView->setMaximumHeight(360);
-        } else {
-            sc.chartView->setSizePolicy(
-                QSizePolicy::Expanding, QSizePolicy::Expanding);
-        }
-
-        // Insert in configured order
-        int insertPos = chartsLayout->count();
-        for (int i = 0; i < sensorIds.size(); ++i) {
-            if (sensorIds[i] == sensorId) {
-                insertPos = i;
-                break;
+        QMap<QString,double> vars=def.params; vars.insert(var,sourceValue);
+        // Let expressions may refer to other lets. Resolve repeatedly so JSON
+        // object ordering is irrelevant.
+        QMap<QString,QString> unresolved=def.lets;
+        bool progressed=true;
+        while(!unresolved.isEmpty() && progressed) {
+            progressed=false;
+            for(auto it=unresolved.begin();it!=unresolved.end();) {
+                double v; QString e;
+                if(ExpressionEvaluator::evaluate(it.value(),vars,&v,&e)) { vars.insert(it.key(),v); it=unresolved.erase(it); progressed=true; }
+                else ++it;
             }
         }
-        if (insertPos > chartsLayout->count())
-            insertPos = chartsLayout->count();
-        chartsLayout->insertWidget(insertPos, sc.chartView, 1);
+        if(!unresolved.isEmpty()) continue;
 
-        sensorCharts[sensorId] = sc;
-    }
-
-    return sensorCharts[sensorId];
-}
-
-void SensorDashboard::updateChart(const QString &sensorId,
-                                  const QJsonArray &dataArray)
-{
-    SensorChart &sc = getOrCreateChart(sensorId);
-    sc.series->clear();
-
-    // Also clear the lower bound series of the area
-    if (sc.area && sc.area->lowerSeries())
-        sc.area->lowerSeries()->clear();
-
-    if (dataArray.isEmpty()) {
-        sc.chart->setTitle(friendlyName(sensorId) + "  (no data)");
-        return;
-    }
-
-    QString unit;
-    double minVal =  std::numeric_limits<double>::max();
-    double maxVal =  std::numeric_limits<double>::lowest();
-    QDateTime minTime, maxTime;
-
-    for (const QJsonValue &val : dataArray) {
-        if (!val.isObject()) continue;
-        QJsonObject reading = val.toObject();
-
-        QString tsStr = reading["timestamp"].toString();
-        QDateTime ts = QDateTime::fromString(tsStr, Qt::ISODate);
-        if (!ts.isValid()) continue;
-
-        double v = 0.0;
-        QJsonValue vField = reading["value"];
-        if (vField.isString())
-            v = vField.toString().toDouble();
-        else if (vField.isDouble())
-            v = vField.toDouble();
-        else
-            continue;
-
-        if (unit.isEmpty() && reading.contains("unit"))
-            unit = reading["unit"].toString();
-
-        sc.series->append(ts.toMSecsSinceEpoch(), v);
-
-        if (v < minVal) minVal = v;
-        if (v > maxVal) maxVal = v;
-        if (!minTime.isValid() || ts < minTime) minTime = ts;
-        if (!maxTime.isValid() || ts > maxTime) maxTime = ts;
-    }
-
-    // Fill the lower bound series so the area renders properly
-    if (sc.area && sc.area->lowerSeries() && sc.series->count() > 0) {
-        QLineSeries *lower = qobject_cast<QLineSeries *>(sc.area->lowerSeries());
-        if (lower) {
-            lower->clear();
-            double floor = floorAtZero(sensorId) ? 0.0 : minVal;
-            for (const QPointF &pt : sc.series->points())
-                lower->append(pt.x(), floor);
+        if(!def.validWhen.trimmed().isEmpty()) {
+            double valid=0; QString e;
+            if(!ExpressionEvaluator::evaluate(def.validWhen,vars,&valid,&e) || valid==0.0) continue; // gap, never zero
         }
+        double value=0; QString e;
+        if(!ExpressionEvaluator::evaluate(def.expression,vars,&value,&e) || !std::isfinite(value)) continue;
+        if(def.floorAtZero && value<0) value=0;
+        QJsonObject d; d.insert("timestamp",r.value("timestamp")); d.insert("value",value); d.insert("unit",def.unit); out.append(d);
     }
+    return out;
+}
 
-    if (sc.series->count() == 0) {
-        sc.chart->setTitle(friendlyName(sensorId) + "  (no valid data)");
-        return;
+void SensorDashboard::evaluateDerivedSeries()
+{
+    for(const QString &id:config.derivedSensorIds()) {
+        const SensorDef d=config.sensorDef(id); QString error;
+        const QJsonArray a=evaluateDerived(d,&error);
+        if(!error.isEmpty()) qWarning()<<"Derived series"<<id<<error;
+        rawSeries.insert(id,a); updateChart(id,a);
     }
-
-    // Title (include unit)
-    QString uLabel = unit.isEmpty() ? unitLabel(sensorId) : unit;
-    sc.chart->setTitle(QString("%1 (%2)  —  %3 readings")
-                           .arg(friendlyName(sensorId))
-                           .arg(uLabel)
-                           .arg(sc.series->count()));
-
-    // Y axis range
-    double yMin = minVal;
-    double yMax = maxVal;
-
-    // Floor at zero for configured sensors
-    if (floorAtZero(sensorId))
-        yMin = 0.0;
-
-    double range = yMax - yMin;
-    double pad   = range * 0.1;
-    if (range == 0) pad = (yMax != 0) ? qAbs(yMax) * 0.1 : 1.0;
-
-    // Don't go below zero for floored sensors
-    double lowerBound = floorAtZero(sensorId) ? 0.0 : (yMin - pad);
-    sc.axisY->setRange(lowerBound, yMax + pad);
-
-    // X axis
-    if (minTime.isValid() && maxTime.isValid())
-        sc.axisX->setRange(minTime, maxTime);
+    setStatus(QString("All series loaded — %1").arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
 }
 
-// ================================================================
-//  Helpers — now delegate to DashboardConfig
-// ================================================================
-
-void SensorDashboard::setStatus(const QString &message)
+SensorChart &SensorDashboard::getOrCreateChart(const QString &id)
 {
-    statusBar()->showMessage(message);
+    if(!sensorCharts.contains(id)) {
+        SensorChart sc; sc.chart=new QChart(); sc.chart->setBackgroundBrush(QColor("#21252b")); sc.chart->legend()->hide();
+        QFont tf;tf.setPixelSize(14);tf.setBold(true);sc.chart->setTitleFont(tf);sc.chart->setTitleBrush(QColor("#cfd8dc"));sc.chart->setTitle(friendlyName(id));
+        sc.series=new QLineSeries(); QPen pen(seriesColor(id));pen.setWidth(2);sc.series->setPen(pen);
+        QLineSeries *lower=new QLineSeries(); sc.area=new QAreaSeries(sc.series,lower);sc.area->setBrush(areaColor(id));sc.area->setPen(pen);sc.chart->addSeries(sc.area);
+        sc.axisX=new QDateTimeAxis();sc.axisX->setFormat("M/dd HH:mm");sc.axisX->setTickCount(5);sc.axisX->setLabelsColor(QColor("#78909c"));sc.chart->addAxis(sc.axisX,Qt::AlignBottom);sc.area->attachAxis(sc.axisX);
+        sc.axisY=new QValueAxis();sc.axisY->setTickCount(5);sc.axisY->setLabelsColor(QColor("#78909c"));sc.chart->addAxis(sc.axisY,Qt::AlignLeft);sc.area->attachAxis(sc.axisY);
+        sc.chartView=new QChartView(sc.chart);sc.chartView->setRenderHint(QPainter::Antialiasing);sc.chartView->setStyleSheet("background-color:#21252b;border-radius:10px;");
+        if(config.scrollableCharts()){sc.chartView->setMinimumHeight(280);sc.chartView->setMaximumHeight(360);} else sc.chartView->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
+        int p=sensorIds.indexOf(id);if(p<0||p>chartsLayout->count())p=chartsLayout->count();chartsLayout->insertWidget(p,sc.chartView,1);sensorCharts.insert(id,sc);
+    }
+    return sensorCharts[id];
 }
 
-QString SensorDashboard::friendlyName(const QString &sensorId)
+void SensorDashboard::updateChart(const QString &id,const QJsonArray &a)
 {
-    return config.displayName(sensorId);
+    SensorChart &sc=getOrCreateChart(id);sc.series->clear();if(sc.area&&sc.area->lowerSeries())sc.area->lowerSeries()->clear();
+    if(a.isEmpty()){sc.chart->setTitle(friendlyName(id)+"  (no data)");return;}
+    double lo=std::numeric_limits<double>::max(),hi=std::numeric_limits<double>::lowest();QDateTime t0,t1;QString unit;
+    for(const QJsonValue &x:a){if(!x.isObject())continue;const QJsonObject r=x.toObject();const QDateTime t=QDateTime::fromString(r.value("timestamp").toString(),Qt::ISODate);if(!t.isValid())continue;bool ok=false;double v=r.value("value").isDouble()?r.value("value").toDouble():r.value("value").toString().toDouble(&ok);if(r.value("value").isDouble())ok=true;if(!ok)continue;sc.series->append(t.toMSecsSinceEpoch(),v);lo=qMin(lo,v);hi=qMax(hi,v);if(!t0.isValid()||t<t0)t0=t;if(!t1.isValid()||t>t1)t1=t;if(unit.isEmpty())unit=r.value("unit").toString();}
+    if(sc.series->count()==0){sc.chart->setTitle(friendlyName(id)+"  (no valid data)");return;}
+    if(QLineSeries *lower=qobject_cast<QLineSeries*>(sc.area->lowerSeries())){double f=floorAtZero(id)?0:lo;for(const QPointF &p:sc.series->points())lower->append(p.x(),f);}
+    const QString u=unit.isEmpty()?unitLabel(id):unit;sc.chart->setTitle(QString("%1 (%2)  —  %3 readings").arg(friendlyName(id),u).arg(sc.series->count()));
+    double ymin=floorAtZero(id)?0:lo,range=hi-ymin,pad=range==0?(hi!=0?qAbs(hi)*.1:1):range*.1;sc.axisY->setRange(floorAtZero(id)?0:ymin-pad,hi+pad);sc.axisX->setRange(t0,t1);
 }
 
-QString SensorDashboard::unitLabel(const QString &sensorId)
-{
-    QString u = config.unit(sensorId);
-    return u.isEmpty() ? QStringLiteral("Value") : u;
-}
-
-QColor SensorDashboard::seriesColor(const QString &sensorId)
-{
-    return config.lineColor(sensorId);
-}
-
-QColor SensorDashboard::areaColor(const QString &sensorId)
-{
-    return config.areaColor(sensorId);
-}
-
-bool SensorDashboard::floorAtZero(const QString &sensorId)
-{
-    return config.floorAtZero(sensorId);
-}
+void SensorDashboard::setStatus(const QString &s){statusBar()->showMessage(s);}
+QString SensorDashboard::friendlyName(const QString &id){return config.displayName(id);}
+QString SensorDashboard::unitLabel(const QString &id){const QString u=config.unit(id);return u.isEmpty()?QStringLiteral("Value"):u;}
+QColor SensorDashboard::seriesColor(const QString &id){return config.lineColor(id);}
+QColor SensorDashboard::areaColor(const QString &id){return config.areaColor(id);}
+bool SensorDashboard::floorAtZero(const QString &id){return config.floorAtZero(id);}
