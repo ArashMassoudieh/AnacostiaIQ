@@ -38,6 +38,21 @@ DEFAULT_COMPONENTS = [
     "sensor_maxbotix_depth",
     "sensor_moisture_sensor",
 ]
+COMPONENT_LABELS = {
+    "application": "Application",
+    "overall": "Overall Health",
+    "cloud": "Cloud / API",
+    "upload_queue": "Upload Queue",
+    "storage": "Storage",
+    "cpu_temperature": "CPU Temperature",
+    "sensor_hcsr04_depth": "Inflow Weir Head",
+    "sensor_maxbotix_depth": "Ponding Depth",
+    "sensor_moisture_sensor": "Soil Moisture / ADC",
+}
+
+
+def component_label(component: str) -> str:
+    return COMPONENT_LABELS.get(component, component.replace("_", " ").title())
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -205,11 +220,12 @@ def main() -> int:
             if not (is_alarm or is_recovery):
                 continue
 
+            label = component_label(component)
             if is_recovery:
-                subject = f"[AnacostiaIQ RECOVERY] {station_name}: {component} healthy"
+                subject = f"[AnacostiaIQ RECOVERY] {station_name}: {label} HEALTHY"
                 heading = "RECOVERY"
             else:
-                subject = f"[AnacostiaIQ ALARM] {station_name}: {component} {current.upper()}"
+                subject = f"[AnacostiaIQ ALARM] {station_name}: {label} {current.upper()}"
                 heading = "ALARM"
 
             body = (
@@ -217,7 +233,7 @@ def main() -> int:
                 f"Station: {station_name}\n"
                 f"Station ID: {station_id}\n"
                 f"Location: {location}\n"
-                f"Component: {component}\n"
+                f"Component: {label}\n"
                 f"Previous state: {old}\n"
                 f"Current state: {current}\n"
                 f"Telemetry time: {timestamp or 'unknown'}\n"
@@ -228,14 +244,14 @@ def main() -> int:
             if enabled:
                 try:
                     send_email(subject, body)
-                    print(f"EMAIL {component}: {old} -> {current}", flush=True)
+                    print(f"EMAIL {component} ({label}): {old} -> {current}", flush=True)
                 except Exception as exc:
                     print(f"ERROR sending {component} alert: {exc}", file=sys.stderr, flush=True)
                     # Do not advance this component's persisted state when mail
                     # fails; retry the transition on the next polling cycle.
                     previous[component]["state"] = old
             else:
-                print(f"DRY-RUN {component}: {old} -> {current} | {subject}", flush=True)
+                print(f"DRY-RUN {component} ({label}): {old} -> {current} | {subject}", flush=True)
 
         if changed:
             state["station_id"] = station_id
