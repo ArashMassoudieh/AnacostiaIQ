@@ -18,6 +18,7 @@
 #include <QList>
 #include <QTimer>
 #include <QString>
+#include <QByteArray>
 
 #include "WeatherFetcher.h"
 
@@ -61,6 +62,7 @@ private:
     QString queuePath;
     QTimer retryTimer;
     bool inFlight = false;
+    QByteArray inFlightKey;
     int failCount = 0;
     int retryDelayMs = 5000;
     QDateTime lastSuccessAt;
@@ -74,6 +76,8 @@ private:
     bool appendToQueueFile(const QJsonObject &json);
     bool rewriteQueueFile();
     void scheduleRetry();
+    int nextPendingIndex() const;
+    static bool isPriorityRecord(const QJsonObject &json);
 };
 
 #endif // DATABASEWRITER_H
