@@ -6,6 +6,8 @@
 
 #include <QString>
 #include <QVector>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include "Sensor.h"
 
 class Config {
@@ -19,8 +21,16 @@ public:
     QString apiUrl() const { return m_apiUrl; }
 
     // Stable station identity used to namespace remote health telemetry.
-    QString stationId() const { return m_stationId; }
-    QString stationName() const { return m_stationName; }
+    // Read from the retained raw JSON so older Config.cpp implementations
+    // remain source-compatible; absent values fall back conservatively.
+    QString stationId() const {
+        const QJsonObject s = QJsonDocument::fromJson(m_raw).object().value("station").toObject();
+        return s.value("id").toString("station_01");
+    }
+    QString stationName() const {
+        const QJsonObject s = QJsonDocument::fromJson(m_raw).object().value("station").toObject();
+        return s.value("name").toString("AnacostiaIQ Station");
+    }
 
     bool adaptiveEnabled() const { return m_adaptiveEnabled; }
     int idleIntervalFactor() const { return m_idleFactor; }
@@ -41,9 +51,6 @@ private:
     int m_pollInterval = 3600;
     double m_barrelDepth = 137.16;
     QString m_apiUrl = "http://54.213.147.59:5000/sensor";
-
-    QString m_stationId = "station_01";
-    QString m_stationName = "AnacostiaIQ Station";
 
     bool m_adaptiveEnabled = true;
     int m_idleFactor = 10;
