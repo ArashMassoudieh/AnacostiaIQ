@@ -4,7 +4,6 @@
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QCheckBox>
@@ -30,28 +29,22 @@
 
 QT_CHARTS_USE_NAMESPACE
 #include <QDateTime>
-#include <QDebug>
-
 #include "DashboardConfig.h"
 
 struct SensorChart {
-    QChart      *chart     = nullptr;
-    QChartView  *chartView = nullptr;
-    QLineSeries *series    = nullptr;
-    QAreaSeries *area      = nullptr;
-    QDateTimeAxis *axisX   = nullptr;
-    QValueAxis    *axisY   = nullptr;
+    QChart *chart=nullptr;
+    QChartView *chartView=nullptr;
+    QLineSeries *series=nullptr;
+    QAreaSeries *area=nullptr;
+    QDateTimeAxis *axisX=nullptr;
+    QValueAxis *axisY=nullptr;
 };
 
 class SensorDashboard : public QMainWindow
 {
     Q_OBJECT
-
 public:
-    // configPath: path to config.json (defaults to "config.json" next
-    // to the executable / in the CWD).
-    SensorDashboard(const QString &configPath = "config.json",
-                    QWidget *parent = nullptr);
+    SensorDashboard(const QString &configPath="config.json", QWidget *parent=nullptr);
     ~SensorDashboard();
 
 private slots:
@@ -68,26 +61,21 @@ private:
     void fetchAllSensors();
     void fetchSensorData(const QString &sensorId);
     void onDataReceived(const QString &sensorId, QNetworkReply *reply);
+    void evaluateDerivedSeries();
+    QJsonArray evaluateDerived(const SensorDef &def, QString *error=nullptr) const;
     void updateChart(const QString &sensorId, const QJsonArray &dataArray);
     SensorChart &getOrCreateChart(const QString &sensorId);
     void setStatus(const QString &message);
 
-    // Display helpers — now thin wrappers over DashboardConfig so the
-    // chart-building code reads the same as before.
     QString friendlyName(const QString &sensorId);
     QString unitLabel(const QString &sensorId);
     QColor seriesColor(const QString &sensorId);
     QColor areaColor(const QString &sensorId);
-    bool   floorAtZero(const QString &sensorId);
+    bool floorAtZero(const QString &sensorId);
 
-    // Configuration (loaded first; drives sensors + display + globals)
     DashboardConfig config;
-
-    // UI
     QWidget *centralWidget;
     QVBoxLayout *mainLayout;
-
-    // Controls
     QGroupBox *controlGroup;
     QLabel *startLabel;
     QDateTimeEdit *startDateTimeEdit;
@@ -96,28 +84,25 @@ private:
     QPushButton *fetchButton;
     QCheckBox *autoRefreshCheckBox;
     QLabel *countdownLabel;
-
-    // Charts area
-    QScrollArea *scrollArea = nullptr;   // used only when scrollable
+    QScrollArea *scrollArea=nullptr;
     QWidget *chartsContainer;
     QVBoxLayout *chartsLayout;
-
-    // One chart per sensor
     QMap<QString, SensorChart> sensorCharts;
 
-    // Sensor list (from config; optionally refreshed from the API)
+    // sensorIds is display order (physical + derived). fetchSensorIds is the
+    // backend request set. rawSeries retains physical/derived samples so
+    // expressions can be evaluated after all network requests complete.
     QStringList sensorIds;
+    QStringList fetchSensorIds;
+    QMap<QString,QJsonArray> rawSeries;
 
-    // Network
     QNetworkAccessManager *networkManager;
     QString apiUrl;
     int pendingRequests;
-
-    // Auto-refresh
     QTimer *refreshTimer;
     QTimer *countdownTimer;
     int countdownSeconds;
-    int refreshIntervalSec = 60;
+    int refreshIntervalSec=60;
 };
 
 #endif // SENSORDASHBOARD_H
