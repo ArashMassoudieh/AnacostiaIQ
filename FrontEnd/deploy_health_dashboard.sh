@@ -10,6 +10,7 @@ REMOTE_USER="${DASH_USER:-ubuntu}"
 DOCROOT="${DASH_DOCROOT:-/home/ubuntu/dashboard}"
 SSH_PORT="${DASH_PORT:-22}"
 SRC="${DASH_HEALTH_SRC:-$SCRIPT_DIR/web/health.html}"
+INDEX_SRC="${DASH_INDEX_SRC:-$SCRIPT_DIR/web/index.html}"
 PEM="${DASH_PEM:-}"
 
 usage(){
@@ -41,6 +42,7 @@ while getopts "i:H:u:d:P:s:h" opt; do
 done
 
 [[ -f "$SRC" ]] || { echo "ERROR: missing health page: $SRC" >&2; exit 1; }
+[[ -f "$INDEX_SRC" ]] || { echo "ERROR: missing landing page: $INDEX_SRC" >&2; exit 1; }
 
 if [[ -z "$PEM" ]]; then
   for candidate in \
@@ -66,13 +68,15 @@ TARGET="$REMOTE_USER@$REMOTE_HOST"
 SSH_OPTS=(-i "$PEM" -p "$SSH_PORT" -o ConnectTimeout=10)
 SCP_OPTS=(-i "$PEM" -P "$SSH_PORT" -o ConnectTimeout=10)
 
-echo "==> Deploying AnacostiaIQ health portal"
-echo "    source : $SRC"
-echo "    target : $TARGET:$DOCROOT/health.html"
+echo "==> Deploying AnacostiaIQ public pages"
+echo "    health : $SRC"
+echo "    index  : $INDEX_SRC"
+echo "    target : $TARGET:$DOCROOT"
 
 ssh "${SSH_OPTS[@]}" "$TARGET" "mkdir -p '$DOCROOT'"
 scp "${SCP_OPTS[@]}" -q "$SRC" "$TARGET:$DOCROOT/health.html"
-ssh "${SSH_OPTS[@]}" "$TARGET" "chmod 644 '$DOCROOT/health.html'"
+scp "${SCP_OPTS[@]}" -q "$INDEX_SRC" "$TARGET:$DOCROOT/index.html"
+ssh "${SSH_OPTS[@]}" "$TARGET" "chmod 644 '$DOCROOT/health.html' '$DOCROOT/index.html'"
 
 BASE="http://$REMOTE_HOST"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/health.html" || true)
@@ -81,5 +85,5 @@ if [[ "$code" != "200" ]]; then
   exit 1
 fi
 
-echo "OK: Health portal deployed"
+echo "OK: AnacostiaIQ public pages deployed"
 echo "$BASE/health.html"
