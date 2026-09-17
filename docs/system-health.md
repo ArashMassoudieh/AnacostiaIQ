@@ -1,6 +1,6 @@
 # AnacostiaIQ system health telemetry
 
-The field service publishes health alongside measurements through the existing
+The station service publishes health alongside measurements through the existing
 `/sensor` API and writes a local snapshot to:
 
 `~/.local/state/anacostiaiq/health.json`
@@ -19,7 +19,8 @@ The field service publishes health alongside measurements through the existing
 The headless service currently evaluates:
 
 - every configured sensor (`health_sensor_<sensor-id>`), including HC-SR04,
-  MaxBotix and moisture/ADC channels;
+  MaxBotix and moisture channels regardless of whether the moisture probe uses
+  the legacy GPIO ADC or ADS1115 transport;
 - the monitoring application heartbeat (`health_application`);
 - cloud/API delivery (`health_cloud`);
 - persistent upload queue growth (`health_upload_queue`);
@@ -28,9 +29,11 @@ The headless service currently evaluates:
 - aggregate station state (`health_overall`).
 
 Health telemetry is published immediately when a component changes level and
-then as a heartbeat every five minutes. It uses the same persistent upload queue
-as normal measurements, so health history is not lost during an Internet/API
-outage.
+then refreshed for every component at the configured heartbeat interval
+(normally five minutes). This prevents a continuously healthy component from
+aging out of the remote dashboard's lookback window. Health records use the same
+persistent upload queue as normal measurements and are prioritized by the
+DatabaseWriter, so health history is retained during an Internet/API outage.
 
 The local JSON snapshot also contains the current human-readable reason, such
 as `sensor_unavailable`, `api_retrying`, `stale_120s`, queue depth, free disk
@@ -40,6 +43,9 @@ space, or CPU temperature.
 
 - sensor: two consecutive completely-invalid readings -> degraded; unavailable
   or stale for more than max(60 s, 3 x configured poll interval) -> offline;
+- moisture boundary detection: repeated calibrated 0% or 100% readings are
+  treated as suspicious after one reading and offline after three identical
+  boundary readings; this check is ADC-transport-independent;
 - cloud: one or two consecutive failed writes -> degraded; three or more ->
   offline;
 - upload queue: 500 pending -> degraded; 2000 pending -> critical;
@@ -48,9 +54,14 @@ space, or CPU temperature.
 
 ## Portal alarms
 
-The station-side work intentionally uses the existing sensor API so it can be
-validated without requiring a simultaneous server migration. The web portal
-still needs an alarm layer that interprets `health_*` records, shows active
-faults, detects a missing `health_application` heartbeat, sends one notification
-per state transition, and sends a recovery notification when the component
-returns to healthy.
+`FrontEnd/web/health.html` interprets the station-scoped `health_*` records,
+shows active degraded/offline/critical components, detects a missing or stale
+`health_application` heartbeat, and can issue browser notifications on state
+transitions and recovery. The dashboard station list is configured through
+`FrontEnd/config.json`.
+
+The field GPIO conflict between HC-SR04 and the UART has been removed: HC-SR04
+uses GPIO17 for TRIG and GPIO18 for ECHO, while the MaxBotix UART input remains
+on GPIO15/RXD0. MaxBotix UART reception is still a separate sensor/wiring-path
+investigation; the health dashboard therefore keeps that component visible
+rather than treating the former GPIO conflict as its current cause.
