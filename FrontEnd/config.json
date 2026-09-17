@@ -34,7 +34,7 @@
       "floor_at_zero": false
     },
     {
-      "_comment": "The MaxBotix (MB7389-100) in the standpipe, read over UART. The Pi publishes it as 'maxbotix_depth' — that is the only id for it, and the old 'MB7389_100_depth' entry is gone: the root config once carried both and a later commit consolidated them into this one. Kept visible because the sensor is part of the installation, but note it returns no data yet (GET /sensors does not list it), which matches the GPIO15/UART0 contention documented on the Pi side — the HC-SR04's TRIG line and this sensor's serial input want the same pin. Until that is resolved this charts empty.",
+      "_comment": "The MaxBotix MB7389-100 in the standpipe is read over /dev/serial0 on GPIO15/RXD0 and uses GPIO25 for its trigger in the field runtime configuration. The previous HC-SR04/UART GPIO conflict has been removed by moving HC-SR04 TRIG to GPIO17. MaxBotix serial reception is still under investigation because standalone exact-trigger testing has not yet produced UART bytes; keep the sensor visible so its eventual data and health state remain apparent.",
       "id": "maxbotix_depth",
       "name": "Ponding Depth",
       "unit": "in",
