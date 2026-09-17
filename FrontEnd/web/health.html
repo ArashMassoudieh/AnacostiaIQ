@@ -6,7 +6,7 @@
 <header><div><h1>AnacostiaIQ System Health</h1><div class="sub">Station-scoped sensor, application, cloud, queue, storage and CPU health</div></div><div class="toolbar"><a class="btn secondary" href="/SensorDashboard.html">Charts</a><button id="notifyBtn" class="secondary">Enable browser alerts</button><button id="refreshBtn">Refresh now</button></div></header>
 <main><div class="summary"><div class="card"><h3>API CONNECTION</h3><div id="apiState" class="big">CHECKING</div><div id="apiDetail" class="seen"></div></div><div class="card"><h3>LAST PORTAL REFRESH</h3><div id="lastRefresh" class="big">--</div><div class="seen">Auto-refresh every 15 s</div></div></div><div id="stations"></div></main>
 <script>
-const COMPONENTS=[['sensor_hcsr04_depth','Inflow Weir Head'],['sensor_maxbotix_depth','Ponding Depth'],['sensor_moisture_sensor','Soil Moisture / ADC'],['application','Application'],['cloud','Cloud / API'],['upload_queue','Upload Queue'],['storage','Storage'],['cpu_temperature','CPU Temperature'],['overall','Overall Station']];
+const COMPONENTS=[['sensor_hcsr04_depth','Inflow Weir Head'],['sensor_maxbotix_depth','Ponding Depth'],['sensor_moisture_sensor','Soil Moisture'],['application','Application'],['cloud','Cloud / API'],['upload_queue','Upload Queue'],['storage','Storage'],['cpu_temperature','CPU Temperature'],['overall','Overall Station']];
 let apiBase='http://54.213.147.59:5000',stations=[];let previous={};
 const stateName=v=>['healthy','degraded','offline','critical'][Number(v)]||'unknown';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
