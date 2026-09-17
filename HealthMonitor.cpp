@@ -117,14 +117,12 @@ void HealthMonitor::evaluate()
             }
         }
 
-        // Explicit physical-disconnect detection for configured moisture/ADC
-        // probes. With this hardware, an absent/open probe can still produce a
-        // syntactically valid ADC rail value which maps to exactly 0 or 100 %.
-        // Do not treat that as healthy just because the ADC transaction worked:
-        // one/two consecutive rail readings are suspicious (DEGRADED), while
-        // three or more indicate a likely disconnected/open sensor (OFFLINE).
-        // A real non-rail measurement immediately starts recovery validation
-        // through the normal Sensor success logic above.
+        // Explicit physical-disconnect detection for configured moisture
+        // probes. This is intentionally independent of the ADC transport
+        // (legacy GPIO ADC or ADS1115): a disconnected/open probe can still
+        // produce a syntactically valid calibrated boundary value of 0 or
+        // 100 %. One/two repeated boundary readings are suspicious; three or
+        // more indicate a likely disconnected/open sensor.
         if ((level == Healthy || level == Degraded) &&
             sensor->id().contains("moisture", Qt::CaseInsensitive) &&
             sensor->hasLastValue() &&
@@ -227,13 +225,15 @@ void HealthMonitor::publishIfNeeded(const QString &id, ComponentState &state,
     if (!m_writer)
         return;
 
-    // Component telemetry is transition-only. Only application and overall
-    // station state need a periodic heartbeat for remote liveness detection.
-    // This keeps health monitoring from amplifying an existing offline queue.
-    const bool heartbeatComponent = (id == "application" || id == "overall");
-    const bool heartbeatDue = heartbeatComponent &&
-        (!state.lastPublishedAt.isValid() ||
-         state.lastPublishedAt.secsTo(now) >= m_heartbeatSeconds);
+    // Publish every component immediately on a level transition and refresh
+    // it periodically as a heartbeat. The remote health dashboard reads these
+    // component records independently; transition-only telemetry eventually
+    // made a continuously healthy component appear UNKNOWN after the portal's
+    // lookback window expired. The heartbeat interval remains configurable and
+    // health records retain priority in DatabaseWriter's persistent queue.
+    const bool heartbeatDue =
+        !state.lastPublishedAt.isValid() ||
+        state.lastPublishedAt.secsTo(now) >= m_heartbeatSeconds;
 
     if (!force && !heartbeatDue)
         return;
