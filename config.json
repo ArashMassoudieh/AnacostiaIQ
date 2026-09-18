@@ -52,6 +52,20 @@
     "dataRateSps": 128,
     "cacheMs": 200
   },
+  "_disabledSensors": [
+    {
+      "_comment": "DISABLED — the app only reads the \"sensors\" array, so this entry is inert here. The MB7389-100 is read over UART: its pin-5 serial output goes to UART0 RXD (GPIO15, header pin 10) and the app reads /dev/ttyAMA0 at 9600 8N1. It is parked because no serial data ever arrived — with GPIO15 correctly muxed to a4/RXD0 and no getty on the port, 'cat /dev/ttyAMA0' produced nothing at all, so the sensor is most likely not wired or not powered. NOTE: re-enabling this conflicts with hcsr04_depth, which drives GPIO15 as TRIG. Only one of the two can be active until the TRIG jumper moves to GPIO23 (header pin 16) or GPIO24 (header pin 18).",
+      "type": "maxbotix",
+      "id": "maxbotix_depth",
+      "unit": "in",
+      "name": "MB7389-100 Depth",
+      "intervalSeconds": 5,
+      "params": {
+        "device": "/dev/ttyAMA0",
+        "totalLength": 48
+      }
+    }
+  ],
   "sensors": [
     {
       "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match.",
@@ -65,7 +79,7 @@
         "chip": "/dev/gpiochip0",
         "trigPin": 17,
         "echoPin": 18,
-        "totalLength": 48
+        "totalLength": 75.3
       }
     },
     {
@@ -90,9 +104,9 @@
       "intervalSeconds": 60,
       "samplesPerReading": 1,
       "params": {
-        "channel": 0,
-        "adcDry": 17155,
-        "adcWet": 6400
+        "dataPin": 5,
+        "adcDry": 105,
+        "adcWet": 32
       }
     }
   ],

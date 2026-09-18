@@ -48,8 +48,10 @@ double MoistureSensor::rawToMoisturePercent(int raw) const {
 }
 
 double MoistureSensor::measure() {
-    if (!m_bus)
+    if (!m_bus) {
+        qWarning() << "MoistureSensor" << id() << ": no ADC bus";
         return -1;
+    }
 
     const int raw = m_bus->read(m_dataPin);
     if (raw < 0)
