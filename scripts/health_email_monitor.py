@@ -92,7 +92,7 @@ def latest_reading(api_base: str, sensor_id: str, lookback_hours: int) -> dict |
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, list) or not payload:
         return None
-    return payload[-1]
+    return max(payload, key=lambda item: str(item.get("timestamp", "")))
 
 
 def reading_state(reading: dict | None, component: str, stale_seconds: int) -> tuple[str, str, str | None]:
@@ -113,7 +113,19 @@ def reading_state(reading: dict | None, component: str, stale_seconds: int) -> t
                 return "offline", f"application heartbeat stale ({int(age)} s)", timestamp
         except ValueError:
             pass
-    return state, f"health state code {code}", timestamp
+    reason = reading.get("reason") or reading.get("unit")
+    if not reason or reason == "state":
+        reason = f"health state code {code}"
+    return state, str(reason), timestamp
+
+
+def parse_time(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def send_email(subject: str, body: str) -> None:
@@ -186,6 +198,7 @@ def main() -> int:
     poll_seconds = max(30, int(os.getenv("ANACOSTIAIQ_ALERT_POLL_SECONDS", "60")))
     stale_seconds = max(60, int(os.getenv("ANACOSTIAIQ_APPLICATION_STALE_SECONDS", "600")))
     lookback_hours = max(1, int(os.getenv("ANACOSTIAIQ_ALERT_LOOKBACK_HOURS", "24")))
+    repeat_seconds = max(0, int(os.getenv("ANACOSTIAIQ_ALERT_REPEAT_SECONDS", "0")))
     state_path = Path(os.getenv("ANACOSTIAIQ_ALERT_STATE", str(Path.home() / ".local/state/anacostiaiq/email-alert-state.json")))
     enabled = env_bool("ANACOSTIAIQ_EMAIL_ALERTS_ENABLED", False)
 
@@ -206,24 +219,57 @@ def main() -> int:
                 print(f"WARN {sensor_id}: {exc}", file=sys.stderr, flush=True)
                 continue
 
-            old = previous.get(component, {}).get("state")
-            previous[component] = {"state": current, "timestamp": timestamp, "checked_at": datetime.now().isoformat(timespec="seconds")}
+            now = datetime.now()
+            old_record = previous.get(component, {})
+            old = old_record.get("state")
+            alarm_since = old_record.get("alarm_since")
+            last_notified_at = old_record.get("last_notified_at")
+            if current in ALARM_STATES and old not in ALARM_STATES:
+                alarm_since = now.isoformat(timespec="seconds")
+                last_notified_at = None
+            elif current in ALARM_STATES and not alarm_since:
+                # Migrate state written by versions predating outage reminders.
+                alarm_since = now.isoformat(timespec="seconds")
+            elif current not in ALARM_STATES:
+                alarm_since = None
+                last_notified_at = None
+            previous[component] = {
+                "state": current,
+                "timestamp": timestamp,
+                "checked_at": now.isoformat(timespec="seconds"),
+                "alarm_since": alarm_since,
+                "last_notified_at": last_notified_at,
+            }
             changed = True
 
             # Establish a baseline silently on first launch. Afterwards notify
             # only on transitions, preventing a restart from generating a storm.
-            if first_cycle or old is None or old == current:
+            if first_cycle or old is None:
                 continue
 
             is_alarm = current in ALARM_STATES
             is_recovery = old in ALARM_STATES and current == "healthy"
-            if not (is_alarm or is_recovery):
+            is_transition = old != current
+            last_notified = parse_time(last_notified_at)
+            alarm_started = parse_time(alarm_since)
+            repeat_anchor = last_notified or alarm_started
+            repeat_due = (
+                repeat_seconds > 0
+                and is_alarm
+                and not is_transition
+                and repeat_anchor is not None
+                and (now - repeat_anchor.replace(tzinfo=None)).total_seconds() >= repeat_seconds
+            )
+            if not ((is_transition and (is_alarm or is_recovery)) or repeat_due):
                 continue
 
             label = component_label(component)
             if is_recovery:
                 subject = f"[AnacostiaIQ RECOVERY] {station_name}: {label} HEALTHY"
                 heading = "RECOVERY"
+            elif repeat_due:
+                subject = f"[AnacostiaIQ REMINDER] {station_name}: {label} {current.upper()}"
+                heading = "PROLONGED OUTAGE REMINDER"
             else:
                 subject = f"[AnacostiaIQ ALARM] {station_name}: {label} {current.upper()}"
                 heading = "ALARM"
@@ -245,6 +291,7 @@ def main() -> int:
                 try:
                     send_email(subject, body)
                     print(f"EMAIL {component} ({label}): {old} -> {current}", flush=True)
+                    previous[component]["last_notified_at"] = now.isoformat(timespec="seconds")
                 except Exception as exc:
                     print(f"ERROR sending {component} alert: {exc}", file=sys.stderr, flush=True)
                     # Do not advance this component's persisted state when mail
@@ -252,6 +299,7 @@ def main() -> int:
                     previous[component]["state"] = old
             else:
                 print(f"DRY-RUN {component} ({label}): {old} -> {current} | {subject}", flush=True)
+                previous[component]["last_notified_at"] = now.isoformat(timespec="seconds")
 
         if changed:
             state["station_id"] = station_id

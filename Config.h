@@ -46,6 +46,11 @@ public:
         return station.value("name").toString("AnacostiaIQ Station");
     }
 
+    QJsonObject healthThresholds() const {
+        return QJsonDocument::fromJson(m_raw).object()
+            .value("health").toObject().value("thresholds").toObject();
+    }
+
     // ── Adaptive polling ───────────────────────────────────
     // When no rain is forecast within rainLookaheadHours, every
     // sensor's interval is multiplied by idleIntervalFactor. The

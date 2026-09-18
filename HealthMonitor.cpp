@@ -33,6 +33,11 @@ void HealthMonitor::setStationIdentity(const QString &id, const QString &name)
         m_stationName = name.trimmed();
 }
 
+void HealthMonitor::setThresholds(const Thresholds &thresholds)
+{
+    m_thresholds = thresholds;
+}
+
 void HealthMonitor::start(int intervalSeconds, int heartbeatSeconds)
 {
     m_heartbeatSeconds = qMax(30, heartbeatSeconds);
@@ -98,7 +103,7 @@ void HealthMonitor::evaluate()
                 reason = QString("recovery_validation_%1_of_2")
                              .arg(sensor->recoverySuccesses());
             }
-        } else if (sensor->consecutiveFailures() >= 2) {
+        } else if (sensor->consecutiveFailures() >= m_thresholds.sensorDegradedFailures) {
             level = Degraded;
             reason = QString("%1_consecutive_failures")
                          .arg(sensor->consecutiveFailures());
@@ -111,7 +116,8 @@ void HealthMonitor::evaluate()
         } else {
             const int base = qMax(1, sensor->pollIntervalSeconds());
             const qint64 age = sensor->lastValidReading().secsTo(now);
-            if (age > qMax(60, base * 3)) {
+            if (age > qMax(m_thresholds.sensorStaleMinimumSeconds,
+                           base * m_thresholds.sensorStalePollFactor)) {
                 level = Offline;
                 reason = QString("stale_%1s").arg(age);
             }
@@ -128,15 +134,16 @@ void HealthMonitor::evaluate()
             sensor->hasLastValue() &&
             (sensor->lastValue() <= 0.01 || sensor->lastValue() >= 99.99)) {
             const int rails = sensor->identicalValidReadings();
-            if (rails >= 3) {
+            if (rails >= m_thresholds.moistureOfflineBoundaryReadings) {
                 level = Offline;
                 reason = QString("sensor_disconnected_boundary_%1")
                              .arg(sensor->lastValue(), 0, 'f', 2);
-            } else if (rails >= 1) {
+            } else if (rails >= m_thresholds.moistureDegradedBoundaryReadings) {
                 level = Degraded;
-                reason = QString("suspect_boundary_%1_%2_of_3")
+                reason = QString("suspect_boundary_%1_%2_of_%3")
                              .arg(sensor->lastValue(), 0, 'f', 2)
-                             .arg(rails);
+                             .arg(rails)
+                             .arg(m_thresholds.moistureOfflineBoundaryReadings);
             }
         }
 
@@ -147,10 +154,10 @@ void HealthMonitor::evaluate()
     if (m_writer) {
         Level cloudLevel = Healthy;
         QString cloudReason = "ok";
-        if (m_writer->consecutiveFailures() >= 3) {
+        if (m_writer->consecutiveFailures() >= m_thresholds.cloudOfflineFailures) {
             cloudLevel = Offline;
             cloudReason = "api_unreachable";
-        } else if (m_writer->consecutiveFailures() > 0) {
+        } else if (m_writer->consecutiveFailures() >= m_thresholds.cloudDegradedFailures) {
             cloudLevel = Degraded;
             cloudReason = "api_retrying";
         }
@@ -160,9 +167,9 @@ void HealthMonitor::evaluate()
         const int queued = m_writer->pendingCount();
         Level queueLevel = Healthy;
         QString queueReason = QString("%1_pending").arg(queued);
-        if (queued >= QUEUE_CRITICAL)
+        if (queued >= m_thresholds.queueCritical)
             queueLevel = Critical;
-        else if (queued >= QUEUE_WARN)
+        else if (queued >= m_thresholds.queueDegraded)
             queueLevel = Degraded;
         updateComponent("upload_queue", queueLevel, queueReason, now);
         overall = worst(overall, queueLevel);
@@ -174,9 +181,9 @@ void HealthMonitor::evaluate()
         Level diskLevel = Healthy;
         const QString diskReason =
             QString("%1_mb_free").arg(available / (1024 * 1024));
-        if (available <= DISK_CRITICAL_BYTES)
+        if (available <= m_thresholds.diskCriticalBytes)
             diskLevel = Critical;
-        else if (available <= DISK_WARN_BYTES)
+        else if (available <= m_thresholds.diskDegradedBytes)
             diskLevel = Degraded;
         updateComponent("storage", diskLevel, diskReason, now);
         overall = worst(overall, diskLevel);
@@ -186,9 +193,9 @@ void HealthMonitor::evaluate()
     if (temp >= 0.0) {
         Level cpuLevel = Healthy;
         const QString cpuReason = QString::number(temp, 'f', 1) + "C";
-        if (temp >= CPU_CRITICAL_C)
+        if (temp >= m_thresholds.cpuCriticalC)
             cpuLevel = Critical;
-        else if (temp >= CPU_WARN_C)
+        else if (temp >= m_thresholds.cpuDegradedC)
             cpuLevel = Degraded;
         updateComponent("cpu_temperature", cpuLevel, cpuReason, now);
         overall = worst(overall, cpuLevel);
@@ -238,8 +245,12 @@ void HealthMonitor::publishIfNeeded(const QString &id, ComponentState &state,
     if (!force && !heartbeatDue)
         return;
 
+    // The API already preserves this text field. For health telemetry it
+    // carries the current human-readable reason while the numeric value
+    // remains the stable 0..3 state code. Older readers that ignore the field
+    // continue to work unchanged.
     m_writer->sendReading("health_" + m_stationId + "_" + id,
-                          static_cast<int>(state.level), "state", now);
+                          static_cast<int>(state.level), state.reason, now);
     state.lastPublishedAt = now;
 }
 
