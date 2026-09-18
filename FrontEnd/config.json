@@ -34,6 +34,15 @@
       "floor_at_zero": false
     },
     {
+      "_comment": "Derived at ingest from Inflow Weir Head using the configured V-notch equation. No values are published below the configured minimum credible head.",
+      "id": "inflow_flow_rate",
+      "name": "Inflow Flow Rate",
+      "unit": "L/s",
+      "color": "#29b6f6",
+      "area_color": "#2829b6f6",
+      "floor_at_zero": true
+    },
+    {
       "_comment": "The MaxBotix MB7389-100 in the standpipe is read over /dev/serial0 on GPIO15/RXD0 and uses GPIO25 for its trigger in the field runtime configuration. The previous HC-SR04/UART GPIO conflict has been removed by moving HC-SR04 TRIG to GPIO17. MaxBotix serial reception is still under investigation because standalone exact-trigger testing has not yet produced UART bytes; keep the sensor visible so its eventual data and health state remain apparent.",
       "id": "maxbotix_depth",
       "name": "Ponding Depth",

@@ -67,6 +67,37 @@ public:
     int     noaaGridX() const           { return m_gridX; }
     int     noaaGridY() const           { return m_gridY; }
 
+    // ── Derived V-notch inflow flow ────────────────────────
+    // The HC-SR04 distance sensor already reports head as
+    // totalLength (sensor-to-crest distance) minus measured range.
+    // These settings convert that stored head to a second, independently
+    // stored flow series. Disabled by default until surveyed geometry is set.
+    QJsonObject weirFlowConfig() const {
+        return QJsonDocument::fromJson(m_raw).object()
+            .value("weirFlow").toObject();
+    }
+    bool weirFlowEnabled() const {
+        return weirFlowConfig().value("enabled").toBool(false);
+    }
+    QString weirHeadSensorId() const {
+        return weirFlowConfig().value("headSensorId").toString("hcsr04_depth");
+    }
+    QString weirFlowSensorId() const {
+        return weirFlowConfig().value("flowSensorId").toString("inflow_flow_rate");
+    }
+    double weirDischargeCoefficient() const {
+        return weirFlowConfig().value("dischargeCoefficient").toDouble(0.0);
+    }
+    double weirNotchAngleDegrees() const {
+        return weirFlowConfig().value("notchAngleDegrees").toDouble(0.0);
+    }
+    double weirMinimumHead() const {
+        return weirFlowConfig().value("minimumHead").toDouble(0.0);
+    }
+    QString weirFlowUnit() const {
+        return weirFlowConfig().value("outputUnit").toString("L/s");
+    }
+
     // ── Sensor factory ─────────────────────────────────────
     // Builds one Sensor* per entry in the JSON "sensors" array.
     // Unknown "type" values are skipped with a warning. Ownership

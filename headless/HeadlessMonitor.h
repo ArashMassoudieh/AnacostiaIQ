@@ -40,6 +40,8 @@ private:
 
     int  effectiveIntervalSeconds(Sensor *s) const;
     void setLowFrequencyMode(bool low);
+    void publishDerivedWeirFlow(Sensor *source, double head);
+    double headToMeters(double head, const QString &unit) const;
 
     QString m_configPath;
 

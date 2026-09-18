@@ -9,6 +9,8 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QMap>
+#include <QtMath>
+#include <cmath>
 
 HeadlessMonitor::HeadlessMonitor(const QString &configPath, QObject *parent)
     : QObject(parent), m_configPath(configPath), healthMonitor(&dbWriter, this) {
@@ -164,7 +166,72 @@ void HeadlessMonitor::pollSensor(Sensor *s) {
                              .arg(s->unit());
 
     dbWriter.sendReading(s->id(), value, s->unit());
+    publishDerivedWeirFlow(s, value);
     healthMonitor.evaluateNow();
+}
+
+double HeadlessMonitor::headToMeters(double head, const QString &unit) const {
+    if (unit.compare("m", Qt::CaseInsensitive) == 0)
+        return head;
+    if (unit.compare("cm", Qt::CaseInsensitive) == 0)
+        return head / 100.0;
+    if (unit.compare("mm", Qt::CaseInsensitive) == 0)
+        return head / 1000.0;
+    if (unit.compare("in", Qt::CaseInsensitive) == 0)
+        return head * 0.0254;
+    qWarning() << "V-notch flow: unsupported head unit" << unit;
+    return -1.0;
+}
+
+void HeadlessMonitor::publishDerivedWeirFlow(Sensor *source, double head) {
+    if (!source || !config.weirFlowEnabled() ||
+        source->id() != config.weirHeadSensorId())
+        return;
+
+    const double cd = config.weirDischargeCoefficient();
+    const double angleDeg = config.weirNotchAngleDegrees();
+    const double minHead = config.weirMinimumHead();
+
+    // Geometry/calibration is deliberately required rather than guessed.
+    if (!(cd > 0.0) || !(angleDeg > 0.0 && angleDeg < 180.0)) {
+        qWarning() << "V-notch flow enabled but dischargeCoefficient/notchAngleDegrees is invalid";
+        return;
+    }
+
+    // At very low head the HC-SR04 resolution dominates the h^(5/2)
+    // relationship. Do not publish a misleading numerical flow value.
+    if (head < minHead) {
+        qInfo().noquote()
+            << QString("Inflow Flow Rate withheld: head %1 %2 < minimum %3 %2")
+                   .arg(head, 0, 'f', 3).arg(source->unit())
+                   .arg(minHead, 0, 'f', 3);
+        return;
+    }
+
+    const double h = headToMeters(head, source->unit());
+    if (!(h >= 0.0))
+        return;
+
+    constexpr double g = 9.80665; // m/s^2
+    const double theta = qDegreesToRadians(angleDeg);
+    const double qM3s = (8.0 / 15.0) * cd * std::sqrt(2.0 * g)
+                       * std::tan(theta / 2.0) * std::pow(h, 2.5);
+
+    QString unit = config.weirFlowUnit();
+    double flow = qM3s;
+    if (unit.compare("L/s", Qt::CaseInsensitive) == 0)
+        flow *= 1000.0;
+    else if (unit.compare("cfs", Qt::CaseInsensitive) == 0)
+        flow *= 35.3146667215;
+    else if (unit.compare("m3/s", Qt::CaseInsensitive) != 0) {
+        qWarning() << "V-notch flow: unsupported outputUnit" << unit
+                   << "— using m3/s";
+        unit = "m3/s";
+    }
+
+    qInfo().noquote() << QString("Inflow Flow Rate = %1 %2")
+                             .arg(flow, 0, 'f', 4).arg(unit);
+    dbWriter.sendReading(config.weirFlowSensorId(), flow, unit);
 }
 
 void HeadlessMonitor::pollWeather() {
