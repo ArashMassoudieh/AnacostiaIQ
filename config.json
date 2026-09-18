@@ -54,7 +54,7 @@
   },
   "_disabledSensors": [
     {
-      "_comment": "DISABLED — the app only reads the \"sensors\" array, so this entry is inert here. The MB7389-100 is read over UART: its pin-5 serial output goes to UART0 RXD (GPIO15, header pin 10) and the app reads /dev/ttyAMA0 at 9600 8N1. It is parked because no serial data ever arrived — with GPIO15 correctly muxed to a4/RXD0 and no getty on the port, 'cat /dev/ttyAMA0' produced nothing at all, so the sensor is most likely not wired or not powered. NOTE: re-enabling this conflicts with hcsr04_depth, which drives GPIO15 as TRIG. Only one of the two can be active until the TRIG jumper moves to GPIO23 (header pin 16) or GPIO24 (header pin 18).",
+      "_comment": "DISABLED — the app only reads the \"sensors\" array, so this entry is inert. The MB7389-100 pin-5 serial output is connected to UART0 RXD on GPIO15 (header pin 10), read through /dev/ttyAMA0 at 9600 8N1. The Pi UART and GPIO mux were verified, and the powered sensor produced a stable byte stream, but not valid R#### carriage-return frames. Install an appropriate inverter/3.3-V level shifter between sensor pin 5 and GPIO15 before re-enabling this entry. HC-SR04 TRIG now uses GPIO17, so there is no GPIO15 conflict.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
@@ -83,19 +83,6 @@
       }
     },
     {
-      "_comment": "MB7389-100: pin-5 serial output goes to Pi header RXD0 (GPIO15, header pin 10). On the CUA Lab Pi, the header UART has been electrically verified by TXD/RXD loopback as /dev/ttyAMA0; /dev/serial0 points to ttyAMA10 and is not the GPIO14/15 header UART on this unit. The app reads 9600 8N1. The id remains maxbotix_depth for cloud-history continuity.",
-      "type": "maxbotix",
-      "id": "maxbotix_depth",
-      "unit": "in",
-      "name": "Ponding Depth",
-      "intervalSeconds": 5,
-      "samplesPerReading": 10,
-      "params": {
-        "device": "/dev/ttyAMA0",
-        "totalLength": 48
-      }
-    },
-    {
       "_comment": "LAB PI ONLY: soil-moisture probe analog output is wired to ADS1115 A0. Initial calibration from bench test on 2026-09-17: dry air ~17155 raw; wet endpoint ~6400 raw. MoistureSensorI2C maps dry to 0% and wet to 100% and clamps outside that range.",
       "id": "moisture_sensor",
       "type": "moisture_ads1115",
@@ -104,9 +91,9 @@
       "intervalSeconds": 60,
       "samplesPerReading": 1,
       "params": {
-        "dataPin": 5,
-        "adcDry": 105,
-        "adcWet": 32
+        "channel": 0,
+        "adcDry": 17155,
+        "adcWet": 6400
       }
     }
   ],
