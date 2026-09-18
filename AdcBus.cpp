@@ -227,6 +227,12 @@ bool AdcBus::convertAndShift() {
         m_values = acc;
         m_haveSample = true;
         m_sampleAge.restart();
+
+        // Raw bytes per channel, directly comparable to the standalone
+        // test program's "ADC n : xxx" output.
+        for (int pin : m_dataPins)
+            qDebug() << "AdcBus: dataPin" << pin << "=" << acc.value(pin);
+
         return true;
     }
     catch (const std::exception &e) {
