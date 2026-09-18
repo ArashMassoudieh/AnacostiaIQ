@@ -54,7 +54,7 @@
   },
   "_disabledSensors": [
     {
-      "_comment": "DISABLED — the app only reads the \"sensors\" array, so this entry is inert. The MB7389-100 pin-5 serial output is connected to UART0 RXD on GPIO15 (header pin 10), read through /dev/ttyAMA0 at 9600 8N1. The Pi UART and GPIO mux were verified, and the powered sensor produced a stable byte stream, but not valid R#### carriage-return frames. Install an appropriate inverter/3.3-V level shifter between sensor pin 5 and GPIO15 before re-enabling this entry. HC-SR04 TRIG now uses GPIO17, so there is no GPIO15 conflict.",
+      "_comment": "DISABLED — the app only reads the \"sensors\" array, so this entry is inert. The CUA lab MB7389-100 pin-5 output was verified on 2026-09-18 as valid but inverted 9600-baud serial: a three-second GPIO15 capture contained 1,176 edges, and offline polarity inversion recovered 31 valid R#### carriage-return frames, while a direct /dev/ttyAMA0 read produced garbage because the waveform idled low. Install an active inverter with a 3.3-V-safe output between sensor pin 5 and GPIO15 (header pin 10) before re-enabling this entry. The lab unit free-runs, so do not add triggerPin. HC-SR04 TRIG uses GPIO17, so there is no GPIO15 conflict.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
