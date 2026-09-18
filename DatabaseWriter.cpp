@@ -7,7 +7,6 @@
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
-#include <QSet>
 #include <QStandardPaths>
 #include <QVariant>
 
@@ -63,6 +62,7 @@ QString DatabaseWriter::resolveQueuePath() const
 void DatabaseWriter::loadQueue()
 {
     pending.clear();
+    pendingKeys.clear();
 
     QFile f(queuePath);
     if (!f.exists())
@@ -74,7 +74,6 @@ void DatabaseWriter::loadQueue()
 
     int badLines = 0;
     int duplicateLines = 0;
-    QSet<QByteArray> seen;
     while (!f.atEnd()) {
         const QByteArray line = f.readLine().trimmed();
         if (line.isEmpty())
@@ -89,12 +88,12 @@ void DatabaseWriter::loadQueue()
 
         const QJsonObject json = doc.object();
         const QByteArray key = queueRecordKey(json);
-        if (seen.contains(key)) {
+        if (pendingKeys.contains(key)) {
             ++duplicateLines;
             continue;
         }
 
-        seen.insert(key);
+        pendingKeys.insert(key);
         pending.append(json);
     }
     f.close();
@@ -167,18 +166,17 @@ void DatabaseWriter::sendReading(const QString &sensorId, double value,
         json["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
 
     const QByteArray key = queueRecordKey(json);
-    for (const QJsonObject &queued : pending) {
-        if (queueRecordKey(queued) == key) {
-            qInfo() << "Skipping duplicate queued reading for"
-                    << sensorId << json["timestamp"].toString();
-            return;
-        }
+    if (pendingKeys.contains(key)) {
+        qInfo() << "Skipping duplicate queued reading for"
+                << sensorId << json["timestamp"].toString();
+        return;
     }
 
     if (!appendToQueueFile(json))
         return;
 
     pending.append(json);
+    pendingKeys.insert(key);
 
     if (!inFlight && !retryTimer.isActive())
         QTimer::singleShot(0, this, &DatabaseWriter::trySendNext);
@@ -297,6 +295,7 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
 
         if (acknowledgedIndex >= 0) {
             pending.removeAt(acknowledgedIndex);
+            pendingKeys.remove(inFlightKey);
         } else {
             qWarning() << "Successful cloud write but in-flight record was not "
                           "found in the persistent queue; retaining remaining data";
