@@ -16,6 +16,7 @@
 #include <QDateTime>
 #include <QVector>
 #include <QList>
+#include <QSet>
 #include <QTimer>
 #include <QString>
 #include <QByteArray>
@@ -59,6 +60,7 @@ private:
     QUrl apiUrl;
 
     QList<QJsonObject> pending;
+    QSet<QByteArray> pendingKeys;
     QString queuePath;
     QTimer retryTimer;
     bool inFlight = false;
