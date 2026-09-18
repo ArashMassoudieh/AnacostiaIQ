@@ -21,7 +21,7 @@
     "intervalSeconds": 1800,
     "source": "openmeteo",
     "latitude": 38.98,
-    "longitude": -77.10,
+    "longitude": -77.1,
     "noaaOffice": "LWX",
     "noaaGridX": 97,
     "noaaGridY": 71
@@ -51,7 +51,7 @@
       }
     },
     {
-      "_comment": "MB7389-100: read over UART, not bit-banged GPIO. Its pin-5 serial output goes to the Pi header UART RX (GPIO15, header pin 10). On this Pi 5, that UART is exposed as /dev/serial0 (-> ttyAMA10, the RP1 PL011) — NOT /dev/ttyAMA0, which on Pi 5 is a separate SoC-internal UART not wired to the header at all. The app reads it at 9600 8N1. The id is kept as maxbotix_depth so its history in the cloud DB stays continuous.",
+      "_comment": "MB7389-100: pin-5 serial output goes to Pi header RXD0 (GPIO15, header pin 10). On the CUA Lab Pi, the header UART has been electrically verified by TXD/RXD loopback as /dev/ttyAMA0; /dev/serial0 points to ttyAMA10 and is not the GPIO14/15 header UART on this unit. The app reads 9600 8N1. The id remains maxbotix_depth for cloud-history continuity.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
@@ -59,7 +59,7 @@
       "intervalSeconds": 5,
       "samplesPerReading": 10,
       "params": {
-        "device": "/dev/serial0",
+        "device": "/dev/ttyAMA0",
         "totalLength": 48
       }
     },
@@ -77,5 +77,15 @@
         "adcWet": 6400
       }
     }
-  ]
+  ],
+  "weirFlow": {
+    "_comment": "Derived V-notch inflow flow. The hcsr04_depth sensor reports head as params.totalLength (sensor-to-crest distance) minus measured range. Keep disabled until the field weir drawing supplies the surveyed sensor-to-crest distance and notch angle, Cd is selected/calibrated, and a defensible minimumHead is set. minimumHead uses the same unit as hcsr04_depth. When enabled, values below minimumHead are withheld rather than reported as zero.",
+    "enabled": false,
+    "headSensorId": "hcsr04_depth",
+    "flowSensorId": "inflow_flow_rate",
+    "dischargeCoefficient": null,
+    "notchAngleDegrees": null,
+    "minimumHead": null,
+    "outputUnit": "L/s"
+  }
 }
