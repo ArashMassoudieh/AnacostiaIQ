@@ -121,6 +121,45 @@ UART is `/dev/ttyAMA0`, **not** `/dev/serial0` — `config.json` says so, and
 `scripts/anacostiaiq-check` reports what `/dev/serial0` actually resolves to on
 your board. Verify before trusting the default.
 
+#### MaxBotix electrical interface and station-specific triggering
+
+Do **not** assume that MaxBotix pin 5 can be connected directly to GPIO15 just
+because both ends use 9600-baud serial. Raspberry Pi GPIO is 3.3-V-only, and
+some MaxBotix units expose an RS-232-style, idle-low waveform whose polarity is
+the inverse of the Pi UART's idle-high logic. Treat pin 5 as potentially
+reaching the sensor supply voltage until it has been measured.
+
+The CUA lab MB7389-100 was verified on 2026-09-18: a three-second GPIO15 edge
+capture contained 1,176 transitions, and offline polarity inversion recovered
+31 valid `R####\r` frames. A direct `/dev/ttyAMA0` read produced repeatable
+garbage because the waveform idled low. Before enabling that sensor, install an
+active inverter with a 3.3-V-safe output, for example:
+
+- a 2N3904 NPN stage with a 10-kohm base resistor and a 10-kohm collector
+  pull-up to 3.3 V; or
+- a 3.3-V-powered logic inverter whose input is explicitly rated to accept the
+  sensor's possible 5-V signal.
+
+Connect sensor ground and Pi ground, route sensor pin 5 to the inverter input,
+and route the inverter's 3.3-V output to GPIO15/RXD0. A resistor divider or a
+generic BSS138 bidirectional level-shifter board does not invert the waveform
+and therefore does not solve this fault.
+
+Triggering is station-specific. The lab sensor produced valid frames while
+free-running, so its configuration must omit `triggerPin`. The field sensor
+uses GPIO25 as `triggerPin`; do not copy that setting to the lab unit. After
+wiring an interface, verify that GPIO15 idles high and inspect the raw UART
+before enabling the sensor:
+
+```bash
+pinctrl get 15
+stty -F /dev/ttyAMA0 9600 cs8 -cstopb -parenb raw -echo
+timeout 3 dd if=/dev/ttyAMA0 bs=1 status=none | od -An -tx1c
+```
+
+The byte stream must contain repeated ASCII `R####` records terminated by
+carriage return (`0d`).
+
 ### 3.3 Dependencies
 
 ```bash
@@ -272,7 +311,7 @@ is `chmod 600` and never committed.
 | `building WITHOUT GPIO` on a Pi | Building the GUI without `DEFINES+=RasPi`, or a non-ARM cross build. |
 | Sensors unavailable, no errors | `RasPi` not defined — the code stubs out hardware access by design. |
 | Second instance exits with code 2 | The other mode holds `~/.local/state/anacostiaiq/hardware.lock`. Use `scripts/anacostiaiq-mode`. |
-| No MaxBotix data | Serial console still enabled, or the sensor is on `/dev/ttyAMA0` vs `/dev/serial0`. Confirm with `scripts/anacostiaiq-check`. |
+| No MaxBotix data or repeatable garbage bytes | Check the serial console and `/dev/ttyAMA0` vs `/dev/serial0` first. Then verify idle polarity and voltage: the lab MB7389 requires an active inverter with a 3.3-V-safe output. Confirm with `scripts/anacostiaiq-check` and the raw-UART procedure in §3.2. |
 | Readings stop reaching the dashboard | Check the queue: `wc -l ~/.local/state/anacostiaiq/upload-queue.jsonl`. A growing file means the API is unreachable; the backlog flushes automatically. |
 
 ---
