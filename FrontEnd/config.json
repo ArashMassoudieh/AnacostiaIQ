@@ -44,7 +44,7 @@
       "floor_at_zero": true
     },
     {
-      "_comment": "The MaxBotix MB7389-100 in the standpipe is read over /dev/serial0 on GPIO15/RXD0 and uses GPIO25 for its trigger in the field runtime configuration. The previous HC-SR04/UART GPIO conflict has been removed by moving HC-SR04 TRIG to GPIO17. MaxBotix serial reception is still under investigation because standalone exact-trigger testing has not yet produced UART bytes; keep the sensor visible so its eventual data and health state remain apparent.",
+      "_comment": "The MaxBotix MB7389-100 in the standpipe is read over the field Pi's electrically verified /dev/ttyAMA0 on GPIO15/RXD0 and uses GPIO25 for its trigger. A direct test of Sean's reference program repeatedly received the valid R5000 no-target sentinel on ttyAMA0, while /dev/serial0 produced no bytes. Production treats R5000 as zero ponding depth and healthy sensor communication.",
       "id": "maxbotix_depth",
       "name": "Ponding Depth",
       "unit": "in",

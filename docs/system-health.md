@@ -74,6 +74,7 @@ SMTP destination are configured in the monitor environment file.
 
 The field GPIO conflict between HC-SR04 and the UART has been removed: HC-SR04
 uses GPIO17 for TRIG and GPIO18 for ECHO, while the MaxBotix UART input remains
-on GPIO15/RXD0. MaxBotix UART reception is still a separate sensor/wiring-path
-investigation; the health dashboard therefore keeps that component visible
-rather than treating the former GPIO conflict as its current cause.
+on GPIO15/RXD0. On the field Pi this header UART has been directly verified as
+`/dev/ttyAMA0`; `/dev/serial0` produced no frames. The MB7389 `R5000` sentinel
+means no target is detected, so production reports zero ponding depth while
+retaining healthy sensor communication.
