@@ -17,6 +17,7 @@
 #include <QVector>
 #include <QList>
 #include <QSet>
+#include <QHash>
 #include <QTimer>
 #include <QString>
 #include <QByteArray>
@@ -42,7 +43,7 @@ public:
     void sendMoistureReading(double moist);
     void sendValveState(bool open);
 
-    int pendingCount() const { return pending.size(); }
+    int pendingCount() const { return pendingKeys.size(); }
     QString queueFilePath() const { return queuePath; }
 
     // Read-only delivery state used by HealthMonitor. A failed cloud write
@@ -64,9 +65,8 @@ private:
     QString queuePath;
     QString acknowledgementPath;
     QTimer retryTimer;
-    bool inFlight = false;
-    QByteArray inFlightKey;
-    int inFlightIndex = -1;
+    QHash<QNetworkReply *, QByteArray> activeReplies;
+    QSet<QByteArray> activeKeys;
     int acknowledgementsSinceCompaction = 0;
     int failCount = 0;
     int retryDelayMs = 5000;
@@ -76,6 +76,7 @@ private:
     static constexpr int INITIAL_RETRY_MS = 5000;
     static constexpr int MAX_RETRY_MS = 5 * 60 * 1000;
     static constexpr int COMPACTION_ACK_THRESHOLD = 100;
+    static constexpr int MAX_CONCURRENT_UPLOADS = 4;
 
     QString resolveQueuePath() const;
     void loadQueue();
