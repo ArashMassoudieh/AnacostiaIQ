@@ -85,3 +85,22 @@ build-SensorDashboard-Desktop_Qt_6_9_0-Debug/
 config.field.json
 config.field.json.backup*
 config.field.json.bak-*
+
+# qmake-generated in-source build artifacts
+.qmake.stash
+moc_*.cpp
+moc_predefs.h
+/Makefile
+/headless/Makefile
+/HC_SR04_ultrasonic_sensor_5/Makefile
+/MB7389-100_ultrasonic_sensor_2/Makefile
+
+# Raspberry Pi build executables
+/AnacostiaIQ
+/headless/anacostiaiqd
+/HC_SR04_ultrasonic_sensor_5/HC_SR04_ultrasonic_sensor_5
+/MB7389-100_ultrasonic_sensor_2/MB7389-100_ultrasonic_sensor_2
+
+# Machine-local generated configuration copies
+/headless/config.json
+/config.json.before-*
