@@ -35,8 +35,8 @@ DatabaseWriter::DatabaseWriter(QObject *parent)
     connect(&retryTimer, &QTimer::timeout,
             this, &DatabaseWriter::trySendNext);
 
-    if (!pending.isEmpty()) {
-        qInfo() << "Loaded" << pending.size()
+    if (!pendingKeys.isEmpty()) {
+        qInfo() << "Loaded" << pendingKeys.size()
                 << "pending cloud write(s) from" << queuePath;
         QTimer::singleShot(0, this, &DatabaseWriter::trySendNext);
     }
@@ -45,7 +45,9 @@ DatabaseWriter::DatabaseWriter(QObject *parent)
 void DatabaseWriter::setApiUrl(const QString &url)
 {
     apiUrl = QUrl(url);
-    if (!pending.isEmpty() && !inFlight && !retryTimer.isActive())
+    if (!pendingKeys.isEmpty() &&
+        activeReplies.size() < MAX_CONCURRENT_UPLOADS &&
+        !retryTimer.isActive())
         QTimer::singleShot(0, this, &DatabaseWriter::trySendNext);
 }
 
@@ -222,7 +224,12 @@ bool DatabaseWriter::rewriteQueueFile()
         return false;
     }
 
+    QList<QJsonObject> livePending;
+    livePending.reserve(pendingKeys.size());
     for (const QJsonObject &json : pending) {
+        if (!pendingKeys.contains(queueRecordKey(json)))
+            continue;
+
         const QByteArray line =
             QJsonDocument(json).toJson(QJsonDocument::Compact) + '\n';
         if (f.write(line) != line.size()) {
@@ -230,12 +237,14 @@ bool DatabaseWriter::rewriteQueueFile()
             f.cancelWriting();
             return false;
         }
+        livePending.append(json);
     }
 
     if (!f.commit()) {
         qWarning() << "Could not atomically commit persistent upload queue";
         return false;
     }
+    pending.swap(livePending);
     return true;
 }
 
@@ -265,7 +274,8 @@ void DatabaseWriter::sendReading(const QString &sensorId, double value,
     pending.append(json);
     pendingKeys.insert(key);
 
-    if (!inFlight && !retryTimer.isActive())
+    if (activeReplies.size() < MAX_CONCURRENT_UPLOADS &&
+        !retryTimer.isActive())
         QTimer::singleShot(0, this, &DatabaseWriter::trySendNext);
 }
 
@@ -301,59 +311,61 @@ int DatabaseWriter::nextPendingIndex() const
     // Health/liveness telemetry must not be blocked by a backlog of forecasts
     // or ordinary observations. Preserve FIFO ordering within the health class.
     for (int i = 0; i < pending.size(); ++i) {
-        if (isPriorityRecord(pending.at(i)))
+        if (!isPriorityRecord(pending.at(i)))
+            continue;
+        const QByteArray key = queueRecordKey(pending.at(i));
+        if (pendingKeys.contains(key) && !activeKeys.contains(key))
             return i;
     }
 
     // With no health telemetry waiting, retain normal FIFO behavior.
-    return pending.isEmpty() ? -1 : 0;
+    for (int i = 0; i < pending.size(); ++i) {
+        const QByteArray key = queueRecordKey(pending.at(i));
+        if (pendingKeys.contains(key) && !activeKeys.contains(key))
+            return i;
+    }
+    return -1;
 }
 
 void DatabaseWriter::trySendNext()
 {
-    if (inFlight || pending.isEmpty())
+    if (pendingKeys.isEmpty() || retryTimer.isActive())
         return;
 
     if (!apiUrl.isValid() || apiUrl.isEmpty()) {
-        qWarning() << "Invalid API URL; keeping" << pending.size()
+        qWarning() << "Invalid API URL; keeping" << pendingKeys.size()
                    << "reading(s) queued locally";
         lastFailureAt = QDateTime::currentDateTime();
         scheduleRetry();
         return;
     }
 
-    const int index = nextPendingIndex();
-    if (index < 0 || index >= pending.size())
-        return;
+    while (activeReplies.size() < MAX_CONCURRENT_UPLOADS) {
+        const int index = nextPendingIndex();
+        if (index < 0 || index >= pending.size())
+            break;
 
-    const QJsonObject record = pending.at(index);
-    const QByteArray data =
-        QJsonDocument(record).toJson(QJsonDocument::Compact);
+        const QJsonObject record = pending.at(index);
+        const QByteArray data =
+            QJsonDocument(record).toJson(QJsonDocument::Compact);
+        const QByteArray key = queueRecordKey(record);
 
-    QNetworkRequest request(apiUrl);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    // A TCP connection attempt can otherwise remain unresolved indefinitely,
-    // leaving inFlight set and preventing the persistent queue from making
-    // any further progress. Let the existing failure counter and exponential
-    // retry path recover from a stalled request without dropping the record.
-    request.setTransferTimeout(15000);
+        QNetworkRequest request(apiUrl);
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        request.setTransferTimeout(15000);
 
-    // Track the exact payload rather than a list index. New readings can be
-    // appended while the HTTP request is in flight, and future queue behavior
-    // may change; acknowledging by payload guarantees that only the record
-    // actually accepted by the server is removed locally.
-    inFlightKey = queueRecordKey(record);
-    inFlightIndex = index;
-    inFlight = true;
-    QNetworkReply *reply = manager->post(request, data);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        onReplyFinished(reply);
-    });
+        QNetworkReply *reply = manager->post(request, data);
+        activeReplies.insert(reply, key);
+        activeKeys.insert(key);
+        connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+            onReplyFinished(reply);
+        });
+    }
 }
 
 void DatabaseWriter::scheduleRetry()
 {
-    if (pending.isEmpty())
+    if (pendingKeys.isEmpty())
         return;
 
     if (!retryTimer.isActive())
@@ -364,7 +376,8 @@ void DatabaseWriter::scheduleRetry()
 
 void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
 {
-    inFlight = false;
+    const QByteArray acknowledgedKey = activeReplies.take(reply);
+    activeKeys.remove(acknowledgedKey);
 
     const int status =
         reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -373,46 +386,28 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
         reply->error() == QNetworkReply::NoError && httpOk;
 
     if (success) {
-        int acknowledgedIndex = -1;
-        if (inFlightIndex >= 0 && inFlightIndex < pending.size() &&
-            queueRecordKey(pending.at(inFlightIndex)) == inFlightKey) {
-            acknowledgedIndex = inFlightIndex;
-        } else {
-            // This should be unreachable with one in-flight request, but retain
-            // an exact-key fallback so an invariant failure cannot remove the
-            // wrong telemetry record.
-            for (int i = 0; i < pending.size(); ++i) {
-                if (queueRecordKey(pending.at(i)) == inFlightKey) {
-                    acknowledgedIndex = i;
-                    break;
-                }
-            }
-        }
-
-        if (acknowledgedIndex >= 0) {
+        if (!acknowledgedKey.isEmpty() &&
+            pendingKeys.contains(acknowledgedKey)) {
             // Journal the acknowledgement before changing memory. Until the
             // next batched compaction, startup recovery uses this exact key to
             // skip the already-delivered record still present in the JSONL.
-            if (!appendAcknowledgement(inFlightKey)) {
+            if (!appendAcknowledgement(acknowledgedKey)) {
                 qWarning() << "Cloud write succeeded but its acknowledgement "
                               "could not be persisted; retaining the record";
-                inFlightKey.clear();
-                inFlightIndex = -1;
                 reply->deleteLater();
                 scheduleRetry();
                 return;
             }
 
-            pending.removeAt(acknowledgedIndex);
-            pendingKeys.remove(inFlightKey);
+            // Leave an in-memory tombstone in the ordered list. The key set is
+            // the logical queue, and batched compaction removes tombstones.
+            // This makes every successful acknowledgement O(1).
+            pendingKeys.remove(acknowledgedKey);
             ++acknowledgementsSinceCompaction;
         } else {
             qWarning() << "Successful cloud write but in-flight record was not "
                           "found in the persistent queue; retaining remaining data";
         }
-        inFlightKey.clear();
-        inFlightIndex = -1;
-
         if (acknowledgementsSinceCompaction >= COMPACTION_ACK_THRESHOLD &&
             !compactQueue()) {
             qWarning() << "Upload queue compaction deferred; acknowledgement "
@@ -421,7 +416,7 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
 
         if (failCount > 0)
             qInfo() << "Cloud connection recovered; flushing"
-                    << pending.size() << "queued reading(s)";
+                    << pendingKeys.size() << "queued reading(s)";
 
         failCount = 0;
         lastSuccessAt = QDateTime::currentDateTime();
@@ -430,22 +425,20 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
 
         reply->deleteLater();
 
-        if (!pending.isEmpty())
+        if (!pendingKeys.isEmpty())
             QTimer::singleShot(0, this, &DatabaseWriter::trySendNext);
         return;
     }
 
     // The failed record remains in pending. Clearing only the transient key
     // allows the priority selector to choose it again on the scheduled retry.
-    inFlightKey.clear();
-    inFlightIndex = -1;
     ++failCount;
     lastFailureAt = QDateTime::currentDateTime();
     if (failCount <= 3) {
         qWarning() << "DB write failed; reading retained locally:"
                    << reply->errorString()
                    << "HTTP" << status
-                   << "| queued:" << pending.size();
+                   << "| queued:" << pendingKeys.size();
     }
     if (failCount == 3) {
         qWarning() << "Suppressing repeated DB errors until connectivity recovers;"
