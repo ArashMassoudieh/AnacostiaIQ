@@ -66,6 +66,12 @@ SensorDef DashboardConfig::defaultDefFor(const QString &id) const
         d.lineColor = QColor("#26c6da");
         d.areaColor = QColor(38, 198, 218, 40);
         d.floorAtZero = false;
+    } else if (id == "inflow_flow_rate") {
+        d.displayName = "Inflow Flow Rate";
+        d.unit = "L/s";
+        d.lineColor = QColor("#29b6f6");
+        d.areaColor = QColor(41, 182, 246, 40);
+        d.floorAtZero = true;
     } else if (id == "valve_state") {
         d.displayName = "Valve State";
         d.unit = "0 / 1";
