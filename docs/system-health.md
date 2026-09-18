@@ -37,7 +37,9 @@ DatabaseWriter, so health history is retained during an Internet/API outage.
 
 The local JSON snapshot also contains the current human-readable reason, such
 as `sensor_unavailable`, `api_retrying`, `stale_120s`, queue depth, free disk
-space, or CPU temperature.
+space, or CPU temperature. Remote health records preserve the same reason in
+the API record's text/unit field while retaining the numeric 0--3 value for
+backward compatibility. Both the web dashboard and email monitor display it.
 
 ## Default thresholds
 
@@ -52,6 +54,10 @@ space, or CPU temperature.
 - disk: <= 500 MB free -> degraded; <= 100 MB -> critical;
 - CPU: >= 70 C -> degraded; >= 80 C -> critical.
 
+All of these defaults can be overridden under `health.thresholds` in the
+station configuration. Missing settings retain the defaults, so existing field
+configuration files remain compatible.
+
 ## Portal alarms
 
 `FrontEnd/web/health.html` interprets the station-scoped `health_*` records,
@@ -59,6 +65,12 @@ shows active degraded/offline/critical components, detects a missing or stale
 `health_application` heartbeat, and can issue browser notifications on state
 transitions and recovery. The dashboard station list is configured through
 `FrontEnd/config.json`.
+
+The server-side email monitor persists transition state across restarts. Set
+`ANACOSTIAIQ_ALERT_REPEAT_SECONDS` to a positive interval to repeat an alert
+only while an outage remains active; the default `0` disables reminders.
+Recipients, monitored components, polling interval, heartbeat staleness and
+SMTP destination are configured in the monitor environment file.
 
 The field GPIO conflict between HC-SR04 and the UART has been removed: HC-SR04
 uses GPIO17 for TRIG and GPIO18 for ECHO, while the MaxBotix UART input remains

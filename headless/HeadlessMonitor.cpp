@@ -53,6 +53,27 @@ bool HeadlessMonitor::start() {
 
     healthMonitor.setStationIdentity(config.stationId(), config.stationName());
     healthMonitor.setSensors(sensors);
+    const QJsonObject ht = config.healthThresholds();
+    HealthMonitor::Thresholds thresholds;
+    thresholds.sensorDegradedFailures = qMax(1, ht.value("sensorDegradedFailures").toInt(2));
+    thresholds.sensorStaleMinimumSeconds = qMax(1, ht.value("sensorStaleMinimumSeconds").toInt(60));
+    thresholds.sensorStalePollFactor = qMax(1, ht.value("sensorStalePollFactor").toInt(3));
+    thresholds.moistureDegradedBoundaryReadings = qMax(1, ht.value("moistureDegradedBoundaryReadings").toInt(1));
+    thresholds.moistureOfflineBoundaryReadings = qMax(thresholds.moistureDegradedBoundaryReadings,
+        ht.value("moistureOfflineBoundaryReadings").toInt(3));
+    thresholds.cloudDegradedFailures = qMax(1, ht.value("cloudDegradedFailures").toInt(1));
+    thresholds.cloudOfflineFailures = qMax(thresholds.cloudDegradedFailures,
+        ht.value("cloudOfflineFailures").toInt(3));
+    thresholds.queueDegraded = qMax(1, ht.value("queueDegraded").toInt(500));
+    thresholds.queueCritical = qMax(thresholds.queueDegraded,
+        ht.value("queueCritical").toInt(2000));
+    thresholds.diskDegradedBytes = qMax<qint64>(1, ht.value("diskDegradedMb").toInt(500)) * 1024LL * 1024LL;
+    thresholds.diskCriticalBytes = qMin(thresholds.diskDegradedBytes,
+        qMax<qint64>(1, ht.value("diskCriticalMb").toInt(100)) * 1024LL * 1024LL);
+    thresholds.cpuDegradedC = ht.value("cpuDegradedC").toDouble(70.0);
+    thresholds.cpuCriticalC = qMax(thresholds.cpuDegradedC,
+        ht.value("cpuCriticalC").toDouble(80.0));
+    healthMonitor.setThresholds(thresholds);
     healthMonitor.start();
 
     startPolling();

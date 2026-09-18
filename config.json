@@ -9,6 +9,24 @@
     "barrelDepthCm": 137.16,
     "apiUrl": "http://54.213.147.59:5000/sensor"
   },
+  "health": {
+    "_comment": "Operational health thresholds. Defaults preserve the original behavior; edit these values without recompiling the service.",
+    "thresholds": {
+      "sensorDegradedFailures": 2,
+      "sensorStaleMinimumSeconds": 60,
+      "sensorStalePollFactor": 3,
+      "moistureDegradedBoundaryReadings": 1,
+      "moistureOfflineBoundaryReadings": 3,
+      "cloudDegradedFailures": 1,
+      "cloudOfflineFailures": 3,
+      "queueDegraded": 500,
+      "queueCritical": 2000,
+      "diskDegradedMb": 500,
+      "diskCriticalMb": 100,
+      "cpuDegradedC": 70,
+      "cpuCriticalC": 80
+    }
+  },
   "adaptive": {
     "_comment": "When no forecast point in the next 'lookaheadHours' exceeds 'rainProbabilityThreshold' percent, every sensor's intervalSeconds is multiplied by 'idleFactor' (low-frequency mode). Rain in the forecast restores the base intervals. The weather poll itself is never scaled — it's what notices rain returning. Set enabled=false to pin the base intervals, or idleFactor=1 for the same effect.",
     "enabled": true,
