@@ -22,6 +22,22 @@ class HealthMonitor : public QObject
     Q_OBJECT
 
 public:
+    struct Thresholds {
+        int sensorDegradedFailures = 2;
+        int sensorStaleMinimumSeconds = 60;
+        int sensorStalePollFactor = 3;
+        int moistureDegradedBoundaryReadings = 1;
+        int moistureOfflineBoundaryReadings = 3;
+        int cloudDegradedFailures = 1;
+        int cloudOfflineFailures = 3;
+        int queueDegraded = 500;
+        int queueCritical = 2000;
+        qint64 diskDegradedBytes = 500LL * 1024LL * 1024LL;
+        qint64 diskCriticalBytes = 100LL * 1024LL * 1024LL;
+        double cpuDegradedC = 70.0;
+        double cpuCriticalC = 80.0;
+    };
+
     enum Level {
         Healthy  = 0,
         Degraded = 1,
@@ -34,6 +50,7 @@ public:
 
     void setSensors(const QVector<Sensor *> &sensors);
     void setStationIdentity(const QString &id, const QString &name = QString());
+    void setThresholds(const Thresholds &thresholds);
     void start(int intervalSeconds = 30, int heartbeatSeconds = 300);
     void stop();
     void evaluateNow();
@@ -67,14 +84,7 @@ private:
     int m_heartbeatSeconds = 300;
     QString m_stationId = "station_01";
     QString m_stationName = "AnacostiaIQ Station";
-
-    // Conservative defaults for a Pi field station.
-    static constexpr int QUEUE_WARN = 500;
-    static constexpr int QUEUE_CRITICAL = 2000;
-    static constexpr qint64 DISK_WARN_BYTES = 500LL * 1024LL * 1024LL;
-    static constexpr qint64 DISK_CRITICAL_BYTES = 100LL * 1024LL * 1024LL;
-    static constexpr double CPU_WARN_C = 70.0;
-    static constexpr double CPU_CRITICAL_C = 80.0;
+    Thresholds m_thresholds;
 };
 
 #endif // HEALTHMONITOR_H
