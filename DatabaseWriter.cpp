@@ -28,6 +28,7 @@ DatabaseWriter::DatabaseWriter(QObject *parent)
     apiUrl = QUrl("http://54.213.147.59:5000/sensor");
 
     queuePath = resolveQueuePath();
+    acknowledgementPath = queuePath + ".acks";
     loadQueue();
 
     retryTimer.setSingleShot(true);
@@ -63,18 +64,42 @@ void DatabaseWriter::loadQueue()
 {
     pending.clear();
     pendingKeys.clear();
+    acknowledgementsSinceCompaction = 0;
+
+    QSet<QByteArray> acknowledgedKeys;
+    int badAcknowledgements = 0;
+    QFile acknowledgements(acknowledgementPath);
+    if (acknowledgements.exists()) {
+        if (!acknowledgements.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qWarning() << "Cannot open upload acknowledgement journal:"
+                       << acknowledgementPath;
+        } else {
+            while (!acknowledgements.atEnd()) {
+                const QByteArray encoded = acknowledgements.readLine().trimmed();
+                if (encoded.isEmpty())
+                    continue;
+
+                const QByteArray key = QByteArray::fromBase64(encoded);
+                if (key.isEmpty() || key.toBase64() != encoded) {
+                    ++badAcknowledgements;
+                    continue;
+                }
+                acknowledgedKeys.insert(key);
+            }
+            acknowledgements.close();
+        }
+    }
 
     QFile f(queuePath);
-    if (!f.exists())
-        return;
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (f.exists() && !f.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qWarning() << "Cannot open persistent upload queue:" << queuePath;
         return;
     }
 
     int badLines = 0;
     int duplicateLines = 0;
-    while (!f.atEnd()) {
+    int acknowledgedLines = 0;
+    while (f.isOpen() && !f.atEnd()) {
         const QByteArray line = f.readLine().trimmed();
         if (line.isEmpty())
             continue;
@@ -88,6 +113,10 @@ void DatabaseWriter::loadQueue()
 
         const QJsonObject json = doc.object();
         const QByteArray key = queueRecordKey(json);
+        if (acknowledgedKeys.contains(key)) {
+            ++acknowledgedLines;
+            continue;
+        }
         if (pendingKeys.contains(key)) {
             ++duplicateLines;
             continue;
@@ -96,7 +125,8 @@ void DatabaseWriter::loadQueue()
         pendingKeys.insert(key);
         pending.append(json);
     }
-    f.close();
+    if (f.isOpen())
+        f.close();
 
     if (badLines > 0)
         qWarning() << "Ignored" << badLines
@@ -105,9 +135,22 @@ void DatabaseWriter::loadQueue()
     if (duplicateLines > 0) {
         qInfo() << "Removed" << duplicateLines
                 << "duplicate persistent upload-queue record(s)";
-        // Compact the on-disk queue immediately so subsequent restarts see the
-        // same de-duplicated source of truth.
-        rewriteQueueFile();
+    }
+
+    if (badAcknowledgements > 0)
+        qWarning() << "Ignored" << badAcknowledgements
+                   << "invalid upload acknowledgement(s)";
+
+    if (acknowledgedLines > 0)
+        qInfo() << "Recovered" << acknowledgedLines
+                << "acknowledged cloud write(s) from the journal";
+
+    // Collapse recovered acknowledgements and duplicate queue entries into a
+    // clean source-of-truth file. The journal is cleared only after the queue
+    // replacement commits, so a crash cannot resurrect acknowledged records.
+    if ((!acknowledgedKeys.isEmpty() || duplicateLines > 0) &&
+        rewriteQueueFile() && !acknowledgedKeys.isEmpty()) {
+        clearAcknowledgementFile();
     }
 }
 
@@ -125,6 +168,50 @@ bool DatabaseWriter::appendToQueueFile(const QJsonObject &json)
         return false;
     }
     return f.flush();
+}
+
+bool DatabaseWriter::appendAcknowledgement(const QByteArray &key)
+{
+    QFile f(acknowledgementPath);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        qWarning() << "Cannot persist upload acknowledgement to"
+                   << acknowledgementPath;
+        return false;
+    }
+
+    const QByteArray line = key.toBase64() + '\n';
+    if (f.write(line) != line.size()) {
+        qWarning() << "Failed writing upload acknowledgement to"
+                   << acknowledgementPath;
+        return false;
+    }
+    return f.flush();
+}
+
+bool DatabaseWriter::clearAcknowledgementFile()
+{
+    QSaveFile f(acknowledgementPath);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "Cannot clear upload acknowledgement journal:"
+                   << acknowledgementPath;
+        return false;
+    }
+    if (!f.commit()) {
+        qWarning() << "Could not atomically clear upload acknowledgement journal";
+        return false;
+    }
+    return true;
+}
+
+bool DatabaseWriter::compactQueue()
+{
+    if (!rewriteQueueFile())
+        return false;
+    if (!clearAcknowledgementFile())
+        return false;
+
+    acknowledgementsSinceCompaction = 0;
+    return true;
 }
 
 bool DatabaseWriter::rewriteQueueFile()
@@ -256,6 +343,7 @@ void DatabaseWriter::trySendNext()
     // may change; acknowledging by payload guarantees that only the record
     // actually accepted by the server is removed locally.
     inFlightKey = queueRecordKey(record);
+    inFlightIndex = index;
     inFlight = true;
     QNetworkReply *reply = manager->post(request, data);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -286,23 +374,50 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
 
     if (success) {
         int acknowledgedIndex = -1;
-        for (int i = 0; i < pending.size(); ++i) {
-            if (queueRecordKey(pending.at(i)) == inFlightKey) {
-                acknowledgedIndex = i;
-                break;
+        if (inFlightIndex >= 0 && inFlightIndex < pending.size() &&
+            queueRecordKey(pending.at(inFlightIndex)) == inFlightKey) {
+            acknowledgedIndex = inFlightIndex;
+        } else {
+            // This should be unreachable with one in-flight request, but retain
+            // an exact-key fallback so an invariant failure cannot remove the
+            // wrong telemetry record.
+            for (int i = 0; i < pending.size(); ++i) {
+                if (queueRecordKey(pending.at(i)) == inFlightKey) {
+                    acknowledgedIndex = i;
+                    break;
+                }
             }
         }
 
         if (acknowledgedIndex >= 0) {
+            // Journal the acknowledgement before changing memory. Until the
+            // next batched compaction, startup recovery uses this exact key to
+            // skip the already-delivered record still present in the JSONL.
+            if (!appendAcknowledgement(inFlightKey)) {
+                qWarning() << "Cloud write succeeded but its acknowledgement "
+                              "could not be persisted; retaining the record";
+                inFlightKey.clear();
+                inFlightIndex = -1;
+                reply->deleteLater();
+                scheduleRetry();
+                return;
+            }
+
             pending.removeAt(acknowledgedIndex);
             pendingKeys.remove(inFlightKey);
+            ++acknowledgementsSinceCompaction;
         } else {
             qWarning() << "Successful cloud write but in-flight record was not "
                           "found in the persistent queue; retaining remaining data";
         }
         inFlightKey.clear();
+        inFlightIndex = -1;
 
-        rewriteQueueFile();
+        if (acknowledgementsSinceCompaction >= COMPACTION_ACK_THRESHOLD &&
+            !compactQueue()) {
+            qWarning() << "Upload queue compaction deferred; acknowledgement "
+                          "journal remains authoritative";
+        }
 
         if (failCount > 0)
             qInfo() << "Cloud connection recovered; flushing"
@@ -323,6 +438,7 @@ void DatabaseWriter::onReplyFinished(QNetworkReply *reply)
     // The failed record remains in pending. Clearing only the transient key
     // allows the priority selector to choose it again on the scheduled retry.
     inFlightKey.clear();
+    inFlightIndex = -1;
     ++failCount;
     lastFailureAt = QDateTime::currentDateTime();
     if (failCount <= 3) {
