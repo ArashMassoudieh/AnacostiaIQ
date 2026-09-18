@@ -208,15 +208,30 @@ double MaxbotixSensor::measure() {
                 if (digits.size() == 4) {
                     int rangeMm = digits.toInt();
 
-                    // Out-of-range sentinels per the MB7389 datasheet
-                    if (rangeMm <= MIN_RANGE_MM || rangeMm >= MAX_RANGE_MM) {
+                    // R0500 and R5000 are valid saturation sentinels from the
+                    // MB7389: target within the minimum range and no target,
+                    // respectively. Reject only values outside that protocol
+                    // range. In particular, R5000 proves that the UART and
+                    // sensor are alive and represents zero ponding depth.
+                    if (rangeMm < MIN_RANGE_MM || rangeMm > MAX_RANGE_MM) {
                         qWarning() << "MaxbotixSensor: range out of bounds:"
                                    << rangeMm << "mm";
                         return -1;
                     }
 
+                    if (rangeMm == MAX_RANGE_MM) {
+                        qInfo() << "MaxbotixSensor: no target detected (R5000)"
+                                << "— reporting zero depth";
+                        return 0.0;
+                    }
+
+                    if (rangeMm == MIN_RANGE_MM)
+                        qWarning() << "MaxbotixSensor: target within minimum range (R0500)";
+
                     double measured = mmToUnit(rangeMm);
-                    double depth = m_totalLength - measured;   // convert distance → water depth
+                    // A measured range beyond the configured standpipe length
+                    // means no ponding; never publish a negative water depth.
+                    double depth = qMax(0.0, m_totalLength - measured);
                     qDebug() << "MaxbotixSensor: distance =" << measured << "depth =" << depth;
                     return depth;
 
