@@ -247,6 +247,11 @@ void DatabaseWriter::trySendNext()
 
     QNetworkRequest request(apiUrl);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    // A TCP connection attempt can otherwise remain unresolved indefinitely,
+    // leaving inFlight set and preventing the persistent queue from making
+    // any further progress. Let the existing failure counter and exponential
+    // retry path recover from a stalled request without dropping the record.
+    request.setTransferTimeout(15000);
 
     // Track the exact payload rather than a list index. New readings can be
     // appended while the HTTP request is in flight, and future queue behavior
