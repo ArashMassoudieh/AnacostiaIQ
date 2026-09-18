@@ -219,11 +219,8 @@ double MaxbotixSensor::measure() {
                         return -1;
                     }
 
-                    if (rangeMm == MAX_RANGE_MM) {
-                        qInfo() << "MaxbotixSensor: no target detected (R5000)"
-                                << "— reporting zero depth";
+                    if (rangeMm == MAX_RANGE_MM)
                         return 0.0;
-                    }
 
                     if (rangeMm == MIN_RANGE_MM)
                         qWarning() << "MaxbotixSensor: target within minimum range (R0500)";
