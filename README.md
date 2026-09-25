@@ -84,6 +84,8 @@ This is the deployment path. Build **in-source** at the repository root: the
 systemd unit and the autostart entry look for `@REPO_DIR@/headless/anacostiaiqd`
 and `@REPO_DIR@/AnacostiaIQ`, and `.gitignore` already covers both.
 
+Before cloning on a new station, use the [Raspberry Pi SSH access guide](docs/raspberry-pi-ssh-access.md) to prepare SSH or discover a Pi whose hostname and IP address are unknown.
+
 ### 3.1 Clone to `~/AnacostiaIQ`
 
 `scripts/anacostiaiq-mode` defaults its repository path to `$HOME/AnacostiaIQ`.
@@ -296,7 +298,7 @@ is `chmod 600` and never committed.
 | `FrontEnd/` | Qt/WebAssembly web dashboard ([build guide](FrontEnd/README.md)) |
 | `scripts/` | Startup installer, mode switcher, diagnostics, email monitor |
 | `deploy/` | systemd and autostart templates, [startup guide](deploy/README-startup.md) |
-| `docs/` | [System health telemetry reference](docs/system-health.md) |
+| `docs/` | [System health telemetry reference](docs/system-health.md), [Raspberry Pi SSH access guide](docs/raspberry-pi-ssh-access.md) |
 | `config.json` | Station configuration read by both builds |
 | `HC_SR04_*`, `MB7389-100_*`, `led_blink_2/`, `All_inclusive_sensor_program/`, `Automated_Multi-ADC_sensing_1/` | Standalone bench-test programs used to validate each sensor |
 
