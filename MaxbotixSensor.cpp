@@ -208,7 +208,7 @@ double MaxbotixSensor::measure() {
                 if (digits.size() == 4) {
                     int rangeMm = digits.toInt();
 
-                    // R0500 and R5000 are valid saturation sentinels from the
+                    // R0300 and R5000 are valid saturation sentinels from the
                     // MB7389: target within the minimum range and no target,
                     // respectively. Reject only values outside that protocol
                     // range. In particular, R5000 proves that the UART and
@@ -223,7 +223,7 @@ double MaxbotixSensor::measure() {
                         return 0.0;
 
                     if (rangeMm == MIN_RANGE_MM)
-                        qWarning() << "MaxbotixSensor: target within minimum range (R0500)";
+                        qWarning() << "MaxbotixSensor: target within minimum range (R0300)";
 
                     double measured = mmToUnit(rangeMm);
                     // A measured range beyond the configured standpipe length

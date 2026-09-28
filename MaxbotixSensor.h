@@ -65,7 +65,7 @@ private:
     std::unique_ptr<gpiod::line_request> m_triggerReq;
 #endif
 
-    static constexpr int MIN_RANGE_MM = 500;    // R0500 = target at/below minimum
+    static constexpr int MIN_RANGE_MM = 300;    // R0300 = target at/below minimum
     static constexpr int MAX_RANGE_MM = 5000;   // R5000 = no target detected
     static constexpr int READ_TIMEOUT_MS = 1000; // give up after this per measure()
     static constexpr int TRIGGER_PULSE_MS = 145; // matches the proven reference timing
