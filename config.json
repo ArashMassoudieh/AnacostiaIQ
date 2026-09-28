@@ -52,20 +52,7 @@
     "dataRateSps": 128,
     "cacheMs": 200
   },
-  "_disabledSensors": [
-    {
-      "_comment": "DISABLED — the app only reads the \"sensors\" array, so this entry is inert. The CUA lab MB7389-100 pin-5 output was verified on 2026-09-18 as valid but inverted 9600-baud serial: a three-second GPIO15 capture contained 1,176 edges, and offline polarity inversion recovered 31 valid R#### carriage-return frames, while a direct /dev/ttyAMA0 read produced garbage because the waveform idled low. Install an active inverter with a 3.3-V-safe output between sensor pin 5 and GPIO15 (header pin 10) before re-enabling this entry. The lab unit free-runs, so do not add triggerPin. HC-SR04 TRIG uses GPIO17, so there is no GPIO15 conflict.",
-      "type": "maxbotix",
-      "id": "maxbotix_depth",
-      "unit": "in",
-      "name": "MB7389-100 Depth",
-      "intervalSeconds": 5,
-      "params": {
-        "device": "/dev/ttyAMA0",
-        "totalLength": 48
-      }
-    }
-  ],
+  "_disabledSensors": [],
   "sensors": [
     {
       "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match.",
@@ -94,6 +81,18 @@
         "channel": 0,
         "adcDry": 17155,
         "adcWet": 6400
+      }
+    },
+    {
+      "_comment": "ENABLED — the CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This lab unit free-runs, so do not add triggerPin to this entry. A second field-style MaxBotix will be added later as a separate sensor after its UART and trigger GPIO are assigned and verified.",
+      "type": "maxbotix",
+      "id": "maxbotix_depth",
+      "unit": "in",
+      "name": "MB7389-100 Depth",
+      "intervalSeconds": 5,
+      "params": {
+        "device": "/dev/ttyAMA0",
+        "totalLength": 48
       }
     }
   ],
