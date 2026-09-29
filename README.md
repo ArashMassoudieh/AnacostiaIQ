@@ -118,6 +118,11 @@ Add your user to the hardware groups and log out and back in:
 sudo usermod -aG gpio,i2c,dialout "$USER"
 ```
 
+For the lab station, one ADS1115 can read as many as four independent
+analog moisture probes. See [Adding moisture probes to the lab
+ADS1115](docs/ads1115-multiple-moisture-sensors.md) for safe wiring,
+per-channel configuration, calibration, and validation.
+
 Note which device node the MaxBotix is on. On the CUA units the GPIO header
 UART is `/dev/ttyAMA0`, **not** `/dev/serial0` — `config.json` says so, and
 `scripts/anacostiaiq-check` reports what `/dev/serial0` actually resolves to on
