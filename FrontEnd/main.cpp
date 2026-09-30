@@ -19,7 +19,14 @@ int main(int argc, char *argv[])
     }
 
     SensorDashboard dashboard(configPath);
+#ifdef Q_OS_WASM
+    // A WebAssembly app lives inside the browser viewport. Opening it as a
+    // normal desktop-sized window leaves unused space around the 1200x850
+    // default; maximize it so the dashboard tracks the full page instead.
+    dashboard.showMaximized();
+#else
     dashboard.show();
+#endif
 
     return app.exec();
 }
