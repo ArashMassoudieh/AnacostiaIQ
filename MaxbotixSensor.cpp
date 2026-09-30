@@ -2,9 +2,9 @@
 // MAXBOTIXSENSOR.CPP - MaxBotix MB7389-100 ultrasonic sensor
 //
 //  Pin connections (Pi to MB7389-100):
-//    5V  -> V+
+//    2.7-5.5V -> V+; use 3.3V for a directly connected 3.3V-safe TTL path
 //    GND -> GND
-//    Pi UART RX <- sensor serial output (pin 5 on the sensor)
+//    Pi UART RX <- sensor serial output (pin 5), through any required interface
 //    Pi GPIO (triggerPin) -> sensor RX/control, if triggerPin >= 0
 //
 //  Serial framing: "Rxxxx\r", xxxx = range in millimetres, 9600 8N1.

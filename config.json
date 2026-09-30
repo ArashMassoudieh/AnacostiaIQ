@@ -84,7 +84,7 @@
       }
     },
     {
-      "_comment": "ENABLED — the CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This lab unit free-runs, so do not add triggerPin to this entry. A second field-style MaxBotix will be added later as a separate sensor after its UART and trigger GPIO are assigned and verified.",
+      "_comment": "ENABLED — the original CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This original lab unit free-runs, so do not add triggerPin to this entry. The new MB7389-100 is a separate sensor on UART2 in the following entry.",
       "type": "maxbotix",
       "id": "maxbotix_depth",
       "unit": "in",
@@ -92,6 +92,18 @@
       "intervalSeconds": 5,
       "params": {
         "device": "/dev/ttyAMA0",
+        "totalLength": 48
+      }
+    },
+    {
+      "_comment": "LAB PI NEW MB7389-100 (label B7604): powered from 3.3 V, sensor pin 5 TTL serial wired directly to GPIO5 / UART2 RX (physical pin 29), and pin 4 left open for continuous ranging. Requires dtoverlay=uart2-pi5 and /dev/ttyAMA2. This is separate from the installed inverted-polarity unit on /dev/ttyAMA0.",
+      "type": "maxbotix",
+      "id": "maxbotix_depth_2",
+      "unit": "in",
+      "name": "New MB7389-100 Depth",
+      "intervalSeconds": 5,
+      "params": {
+        "device": "/dev/ttyAMA2",
         "totalLength": 48
       }
     }

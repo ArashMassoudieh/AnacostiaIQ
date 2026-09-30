@@ -167,6 +167,12 @@ timeout 3 dd if=/dev/ttyAMA0 bs=1 status=none | od -An -tx1c
 The byte stream must contain repeated ASCII `R####` records terminated by
 carriage return (`0d`).
 
+
+#### Second lab MB7389 on Raspberry Pi 5 UART2
+
+The lab can run two MaxBotix sensors simultaneously when each has a distinct UART. The original inverted-polarity unit remains on GPIO15 and `/dev/ttyAMA0`. The new MB7389-100 labelled B7604 is powered from 3.3 V and uses its TTL serial output directly on GPIO5, physical pin 29, through `/dev/ttyAMA2`. Enable `dtoverlay=uart2-pi5` and reboot before enabling the second configuration entry. See [Two MaxBotix sensors on the lab Raspberry Pi](docs/lab-dual-maxbotix.md).
+
+
 ### 3.3 Dependencies
 
 ```bash

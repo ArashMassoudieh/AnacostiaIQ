@@ -36,6 +36,7 @@ DEFAULT_COMPONENTS = [
     "cpu_temperature",
     "sensor_hcsr04_depth",
     "sensor_maxbotix_depth",
+    "sensor_maxbotix_depth_2",
     "sensor_moisture_sensor",
 ]
 COMPONENT_LABELS = {
@@ -46,7 +47,8 @@ COMPONENT_LABELS = {
     "storage": "Storage",
     "cpu_temperature": "CPU Temperature",
     "sensor_hcsr04_depth": "Inflow Weir Head",
-    "sensor_maxbotix_depth": "Ponding Depth",
+    "sensor_maxbotix_depth": "Original MaxBotix Depth",
+    "sensor_maxbotix_depth_2": "New MaxBotix Depth",
     "sensor_moisture_sensor": "Soil Moisture / ADC",
 }
 
