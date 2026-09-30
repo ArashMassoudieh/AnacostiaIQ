@@ -16,6 +16,8 @@
     {"id": "sensor_lab_maxbotix_depth_1", "name": "Original MB7389"},
     {"id": "sensor_lab_maxbotix_depth_2", "name": "New MB7389 B7604"},
     {"id": "sensor_lab_moisture_a0", "name": "Soil Moisture A0"},
+    {"id": "sensor_lab_moisture_a1", "name": "Soil Moisture A1"},
+    {"id": "sensor_lab_moisture_a2", "name": "Soil Moisture A2"},
     {"id": "application", "name": "Application"},
     {"id": "cloud", "name": "Cloud / API"},
     {"id": "upload_queue", "name": "Upload Queue"},
@@ -64,24 +66,24 @@
       "floor_at_zero": true
     },
     {
-      "_comment": "Enable after A1 has its own wet/dry calibration and is added to the Pi sensor configuration.",
+      "_comment": "Active with provisional 23000/6400 calibration; replace with this probe's measured endpoints before quantitative use.",
       "id": "lab_moisture_a1",
       "name": "Lab Soil Moisture A1",
       "unit": "%",
       "color": "#66bb6a",
       "area_color": "#2866bb6a",
       "floor_at_zero": true,
-      "visible": false
+      "visible": true
     },
     {
-      "_comment": "Enable after A2 has its own wet/dry calibration and is added to the Pi sensor configuration.",
+      "_comment": "Active with provisional 23000/6400 calibration; replace with this probe's measured endpoints before quantitative use.",
       "id": "lab_moisture_a2",
       "name": "Lab Soil Moisture A2",
       "unit": "%",
       "color": "#ffa726",
       "area_color": "#28ffa726",
       "floor_at_zero": true,
-      "visible": false
+      "visible": true
     }
   ]
 }

@@ -1,8 +1,8 @@
 # Adding moisture probes to the lab ADS1115
 
 The lab station uses one ADS1115 at I2C address `0x48` on `/dev/i2c-1`.
-The converter provides four single-ended analog inputs, A0 through A3. A0 is
-the existing lab moisture probe, so A1, A2, and A3 can each accept one
+The converter provides four single-ended analog inputs, A0 through A3. A0,
+A1, and A2 are active lab moisture probes. A3 remains available for one
 additional analog-output moisture probe.
 
 No C++ change or rebuild is required. `Ads1115Bus` already performs an
@@ -26,11 +26,11 @@ between ground and 3.3 V. Do not power a probe from 5 V unless its analog
 output is independently limited to the ADS1115-safe range.
 
 Before connecting a probe, confirm that its selected ADS1115 terminal is
-physically empty and is not bridged to another breadboard row or input. A
-2026-09-29 direct scan of the lab converter found approximately 0.912 V on
-each unconfigured A1-A3 input. Floating high-impedance inputs can retain a
-repeatable voltage, so that reading alone does not indicate a connected
-sensor.
+physically empty and is not bridged to another breadboard row or input.
+Floating high-impedance inputs can retain a repeatable voltage, so a voltage
+reading alone does not indicate a connected sensor. On 2026-09-30, direct
+sampling confirmed stable connected signals on A1 (21578 raw / 2.697 V) and
+A2 (21370 raw / 2.671 V); A3 remained unconfigured.
 
 ## Configure a sensor
 
@@ -40,7 +40,7 @@ Add one object per probe to the `sensors` array in the repository-root
 ```json
 {
   "_comment": "Additional soil-moisture probe connected to ADS1115 A1.",
-  "id": "moisture_sensor_a1",
+  "id": "lab_moisture_a1",
   "type": "moisture_ads1115",
   "unit": "%",
   "name": "Soil Moisture A1",
@@ -48,7 +48,7 @@ Add one object per probe to the `sensors` array in the repository-root
   "samplesPerReading": 1,
   "params": {
     "channel": 1,
-    "adcDry": 17155,
+    "adcDry": 23000,
     "adcWet": 6400
   }
 }
@@ -58,15 +58,16 @@ Use a unique `id`, display `name`, and channel for every probe:
 
 | ADS input | `channel` | Suggested ID |
 |---|---:|---|
-| A0 | 0 | `moisture_sensor` (existing) |
-| A1 | 1 | `moisture_sensor_a1` |
-| A2 | 2 | `moisture_sensor_a2` |
-| A3 | 3 | `moisture_sensor_a3` |
+| A0 | 0 | `lab_moisture_a0` (active) |
+| A1 | 1 | `lab_moisture_a1` (active) |
+| A2 | 2 | `lab_moisture_a2` (active) |
+| A3 | 3 | `lab_moisture_a3` (available) |
 
-The example's `adcDry` and `adcWet` values are the initial calibration for
-the existing A0 probe. They are suitable only as temporary starting values
-for another probe. Calibrate every probe independently; component and soil
-variation can otherwise make the displayed percentage misleading.
+The example's `adcDry` and `adcWet` values are the provisional calibration
+used for A1 and A2. They keep the live channels away from a false 0% boundary
+alarm, but they are not quantitative calibration. Calibrate every probe
+independently; component and soil variation can otherwise make the displayed
+percentage misleading.
 
 ## Calibrate each probe
 

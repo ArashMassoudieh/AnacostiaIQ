@@ -84,6 +84,34 @@
       }
     },
     {
+      "_comment": "LAB PI ONLY: additional moisture probe on ADS1115 A1. Direct sampling on 2026-09-30 measured a stable 21578 raw (2.697 V). The 23000 dry and 6400 wet endpoints are provisional; replace them with this probe's measured dry and representative-wet endpoints before quantitative use.",
+      "id": "lab_moisture_a1",
+      "type": "moisture_ads1115",
+      "unit": "%",
+      "name": "Soil Moisture A1",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 1,
+        "adcDry": 23000,
+        "adcWet": 6400
+      }
+    },
+    {
+      "_comment": "LAB PI ONLY: additional moisture probe on ADS1115 A2. Direct sampling on 2026-09-30 measured a stable 21370 raw (2.671 V). The 23000 dry and 6400 wet endpoints are provisional; replace them with this probe's measured dry and representative-wet endpoints before quantitative use.",
+      "id": "lab_moisture_a2",
+      "type": "moisture_ads1115",
+      "unit": "%",
+      "name": "Soil Moisture A2",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 2,
+        "adcDry": 23000,
+        "adcWet": 6400
+      }
+    },
+    {
       "_comment": "ENABLED — the original CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This original lab unit free-runs, so do not add triggerPin to this entry. The new MB7389-100 is a separate sensor on UART2 in the following entry. Published with lab-specific ID lab_maxbotix_depth_1 so cloud data cannot mix with the field station.",
       "type": "maxbotix",
       "id": "lab_maxbotix_depth_1",
