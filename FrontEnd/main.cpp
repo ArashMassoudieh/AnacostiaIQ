@@ -1,5 +1,6 @@
 #include "SensorDashboard.h"
 #include <QApplication>
+#include <QScreen>
 #include <QStringList>
 
 // Entry point. The config file path can be overridden on the command
@@ -20,10 +21,20 @@ int main(int argc, char *argv[])
 
     SensorDashboard dashboard(configPath);
 #ifdef Q_OS_WASM
-    // A WebAssembly app lives inside the browser viewport. Opening it as a
-    // normal desktop-sized window leaves unused space around the 1200x850
-    // default; maximize it so the dashboard tracks the full page instead.
-    dashboard.showMaximized();
+    // Treat the browser viewport as the application window. Qt/Wasm can
+    // maximize only the top-level decoration while leaving a previously
+    // resized central widget at its old width, so set the complete geometry
+    // explicitly and repeat that whenever the browser viewport changes.
+    QScreen *browserScreen = QApplication::primaryScreen();
+    if (browserScreen)
+        dashboard.setGeometry(browserScreen->availableGeometry());
+    dashboard.show();
+    if (browserScreen) {
+        QObject::connect(browserScreen, &QScreen::availableGeometryChanged,
+                         &dashboard, [&dashboard](const QRect &geometry) {
+            dashboard.setGeometry(geometry);
+        });
+    }
 #else
     dashboard.show();
 #endif

@@ -96,6 +96,12 @@ void SensorDashboard::finishInitialization()
 
     setupUI();
 
+    // Create chart widgets in configured order before asynchronous network
+    // replies arrive. Creating them from reply callbacks lets whichever
+    // sensor responds first determine the visible order.
+    for (const QString &id : sensorIds)
+        getOrCreateChart(id);
+
     // Auto-refresh on by default if the config asked for it.
     if (config.autoRefreshDefault())
         autoRefreshCheckBox->setChecked(true);
@@ -119,7 +125,12 @@ SensorDashboard::~SensorDashboard()
 void SensorDashboard::setupUI()
 {
     setWindowTitle(config.windowTitle());
+#ifndef Q_OS_WASM
+    // Desktop builds start at a practical window size. The browser build is
+    // sized from the live viewport in main.cpp instead; keeping this resize
+    // there leaves the central widget stuck at 1200 px after maximization.
     resize(1200, 850);
+#endif
 
     // ── Global stylesheet (modern, flat) ───────────────────────
     setStyleSheet(R"(
