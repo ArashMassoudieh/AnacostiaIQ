@@ -104,3 +104,5 @@ moc_predefs.h
 # Machine-local generated configuration copies
 /headless/config.json
 /config.json.before-*
+
+FrontEnd/build/WebAssembly_Qt_6_9_1_singlethread-Release/
