@@ -437,7 +437,7 @@ SensorChart &SensorDashboard::getOrCreateChart(const QString &sensorId)
 
         // Title
         QFont titleFont;
-        titleFont.setPixelSize(14);
+        titleFont.setPixelSize(18);
         titleFont.setBold(true);
         sc.chart->setTitleFont(titleFont);
         sc.chart->setTitleBrush(QBrush(QColor("#cfd8dc")));
@@ -471,9 +471,9 @@ SensorChart &SensorDashboard::getOrCreateChart(const QString &sensorId)
         sc.axisX->setGridLineVisible(true);
         sc.axisX->setGridLineColor(QColor("#2d3139"));
         sc.axisX->setLinePenColor(QColor("#3a3f47"));
-        sc.axisX->setLabelsColor(QColor("#78909c"));
+        sc.axisX->setLabelsColor(QColor("#b0bec5"));
         QFont axisFont;
-        axisFont.setPixelSize(10);
+        axisFont.setPixelSize(13);
         sc.axisX->setLabelsFont(axisFont);
         sc.chart->addAxis(sc.axisX, Qt::AlignBottom);
         sc.area->attachAxis(sc.axisX);
@@ -483,7 +483,7 @@ SensorChart &SensorDashboard::getOrCreateChart(const QString &sensorId)
         sc.axisY->setGridLineVisible(true);
         sc.axisY->setGridLineColor(QColor("#2d3139"));
         sc.axisY->setLinePenColor(QColor("#3a3f47"));
-        sc.axisY->setLabelsColor(QColor("#78909c"));
+        sc.axisY->setLabelsColor(QColor("#b0bec5"));
         sc.axisY->setLabelsFont(axisFont);
         sc.axisY->setTickCount(5);
         sc.chart->addAxis(sc.axisY, Qt::AlignLeft);
@@ -496,8 +496,8 @@ SensorChart &SensorDashboard::getOrCreateChart(const QString &sensorId)
             "background-color: #21252b; border-radius: 10px;");
 
         if (config.scrollableCharts()) {
-            sc.chartView->setMinimumHeight(280);
-            sc.chartView->setMaximumHeight(360);
+            sc.chartView->setMinimumHeight(320);
+            sc.chartView->setMaximumHeight(400);
         } else {
             sc.chartView->setSizePolicy(
                 QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -539,7 +539,8 @@ void SensorDashboard::updateChart(const QString &sensorId,
     QString unit;
     double minVal =  std::numeric_limits<double>::max();
     double maxVal =  std::numeric_limits<double>::lowest();
-    QDateTime minTime, maxTime;
+    QDateTime minTime, maxTime, latestTime;
+    double latestValue = 0.0;
 
     for (const QJsonValue &val : dataArray) {
         if (!val.isObject()) continue;
@@ -567,6 +568,10 @@ void SensorDashboard::updateChart(const QString &sensorId,
         if (v > maxVal) maxVal = v;
         if (!minTime.isValid() || ts < minTime) minTime = ts;
         if (!maxTime.isValid() || ts > maxTime) maxTime = ts;
+        if (!latestTime.isValid() || ts > latestTime) {
+            latestTime = ts;
+            latestValue = v;
+        }
     }
 
     // Fill the lower bound series so the area renders properly
@@ -585,10 +590,16 @@ void SensorDashboard::updateChart(const QString &sensorId,
         return;
     }
 
-    // Title (include unit)
+    // Put the newest value in large, high-contrast title text. Axis labels
+    // remain useful for trends, but users should not have to infer the live
+    // reading from a compressed line chart.
     QString uLabel = unit.isEmpty() ? unitLabel(sensorId) : unit;
-    sc.chart->setTitle(QString("%1 (%2)  —  %3 readings")
+    double absLatest = qAbs(latestValue);
+    int decimals = absLatest >= 100.0 ? 0 : (absLatest >= 10.0 ? 1 : 2);
+    QString latestText = QString::number(latestValue, 'f', decimals);
+    sc.chart->setTitle(QString("%1  —  Latest: %2 %3  ·  %4 readings")
                            .arg(friendlyName(sensorId))
+                           .arg(latestText)
                            .arg(uLabel)
                            .arg(sc.series->count()));
 
@@ -607,6 +618,7 @@ void SensorDashboard::updateChart(const QString &sensorId,
     // Don't go below zero for floored sensors
     double lowerBound = floorAtZero(sensorId) ? 0.0 : (yMin - pad);
     sc.axisY->setRange(lowerBound, yMax + pad);
+    sc.axisY->setLabelFormat(qAbs(yMax + pad) >= 100.0 ? "%.0f" : "%.1f");
 
     // X axis
     if (minTime.isValid() && maxTime.isValid())

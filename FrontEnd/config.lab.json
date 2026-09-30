@@ -27,7 +27,7 @@
   ],
   "refresh_interval_sec": 30,
   "auto_refresh": true,
-  "scrollable_charts": false,
+  "scrollable_charts": true,
   "default_range": {
     "days_back": 1,
     "days_ahead": 0
