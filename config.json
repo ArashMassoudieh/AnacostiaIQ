@@ -55,9 +55,9 @@
   "_disabledSensors": [],
   "sensors": [
     {
-      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match.",
+      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match. Published with lab-specific ID lab_hcsr04_depth so cloud data cannot mix with the field station.",
       "type": "distance",
-      "id": "hcsr04_depth",
+      "id": "lab_hcsr04_depth",
       "unit": "in",
       "name": "Inflow Weir Head",
       "intervalSeconds": 5,
@@ -70,8 +70,8 @@
       }
     },
     {
-      "_comment": "LAB PI ONLY: soil-moisture probe analog output is wired to ADS1115 A0. Initial calibration from bench test on 2026-09-17: dry air ~17155 raw; wet endpoint ~6400 raw. MoistureSensorI2C maps dry to 0% and wet to 100% and clamps outside that range.",
-      "id": "moisture_sensor",
+      "_comment": "LAB PI ONLY: soil-moisture probe analog output is wired to ADS1115 A0. Initial calibration from bench test on 2026-09-17: dry air ~17155 raw; wet endpoint ~6400 raw. MoistureSensorI2C maps dry to 0% and wet to 100% and clamps outside that range. Published with lab-specific ID lab_moisture_a0 so cloud data cannot mix with the field station.",
+      "id": "lab_moisture_a0",
       "type": "moisture_ads1115",
       "unit": "%",
       "name": "Soil Moisture",
@@ -84,9 +84,9 @@
       }
     },
     {
-      "_comment": "ENABLED — the original CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This original lab unit free-runs, so do not add triggerPin to this entry. The new MB7389-100 is a separate sensor on UART2 in the following entry.",
+      "_comment": "ENABLED — the original CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This original lab unit free-runs, so do not add triggerPin to this entry. The new MB7389-100 is a separate sensor on UART2 in the following entry. Published with lab-specific ID lab_maxbotix_depth_1 so cloud data cannot mix with the field station.",
       "type": "maxbotix",
-      "id": "maxbotix_depth",
+      "id": "lab_maxbotix_depth_1",
       "unit": "in",
       "name": "MB7389-100 Depth",
       "intervalSeconds": 5,
@@ -96,9 +96,9 @@
       }
     },
     {
-      "_comment": "LAB PI NEW MB7389-100 (label B7604): powered from 3.3 V, sensor pin 5 TTL serial wired directly to GPIO5 / UART2 RX (physical pin 29), and pin 4 left open for continuous ranging. Requires dtoverlay=uart2-pi5 and /dev/ttyAMA2. This is separate from the installed inverted-polarity unit on /dev/ttyAMA0.",
+      "_comment": "LAB PI NEW MB7389-100 (label B7604): powered from 3.3 V, sensor pin 5 TTL serial wired directly to GPIO5 / UART2 RX (physical pin 29), and pin 4 left open for continuous ranging. Requires dtoverlay=uart2-pi5 and /dev/ttyAMA2. This is separate from the installed inverted-polarity unit on /dev/ttyAMA0. Published with lab-specific ID lab_maxbotix_depth_2 so cloud data cannot mix with the field station.",
       "type": "maxbotix",
-      "id": "maxbotix_depth_2",
+      "id": "lab_maxbotix_depth_2",
       "unit": "in",
       "name": "New MB7389-100 Depth",
       "intervalSeconds": 5,
@@ -109,9 +109,9 @@
     }
   ],
   "weirFlow": {
-    "_comment": "Derived V-notch inflow flow. The hcsr04_depth sensor reports head as params.totalLength (sensor-to-crest distance) minus measured range. Keep disabled until the field weir drawing supplies the surveyed sensor-to-crest distance and notch angle, Cd is selected/calibrated, and a defensible minimumHead is set. minimumHead uses the same unit as hcsr04_depth. When enabled, values below minimumHead are withheld rather than reported as zero.",
+    "_comment": "Derived V-notch inflow flow. The lab_hcsr04_depth sensor reports head as params.totalLength (sensor-to-crest distance) minus measured range. Keep disabled until the field weir drawing supplies the surveyed sensor-to-crest distance and notch angle, Cd is selected/calibrated, and a defensible minimumHead is set. minimumHead uses the same unit as lab_hcsr04_depth. When enabled, values below minimumHead are withheld rather than reported as zero.",
     "enabled": false,
-    "headSensorId": "hcsr04_depth",
+    "headSensorId": "lab_hcsr04_depth",
     "flowSensorId": "inflow_flow_rate",
     "dischargeCoefficient": null,
     "notchAngleDegrees": null,

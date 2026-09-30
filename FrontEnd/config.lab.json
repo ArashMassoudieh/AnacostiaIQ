@@ -1,0 +1,87 @@
+{
+  "_comment": "Separate dashboard configuration for the CUA lab station. Lab measurement IDs are intentionally namespaced so DynamoDB does not mix them with field-station series.",
+  "api_url": "http://54.213.147.59:5000",
+  "health_application_stale_seconds": 600,
+  "window_title": "AnacostiaIQ — CUA Lab Dashboard",
+  "health_stations": [
+    {
+      "id": "lab_station_01",
+      "name": "CUA Lab Station",
+      "location": "Catholic University · Washington, DC",
+      "visible": true
+    }
+  ],
+  "health_components": [
+    {"id": "sensor_lab_hcsr04_depth", "name": "Inflow Weir Head"},
+    {"id": "sensor_lab_maxbotix_depth_1", "name": "Original MB7389"},
+    {"id": "sensor_lab_maxbotix_depth_2", "name": "New MB7389 B7604"},
+    {"id": "sensor_lab_moisture_a0", "name": "Soil Moisture A0"},
+    {"id": "application", "name": "Application"},
+    {"id": "cloud", "name": "Cloud / API"},
+    {"id": "upload_queue", "name": "Upload Queue"},
+    {"id": "storage", "name": "Storage"},
+    {"id": "cpu_temperature", "name": "CPU Temperature"},
+    {"id": "overall", "name": "Overall Station"}
+  ],
+  "refresh_interval_sec": 30,
+  "auto_refresh": true,
+  "scrollable_charts": false,
+  "default_range": {
+    "days_back": 1,
+    "days_ahead": 0
+  },
+  "sensors": [
+    {
+      "id": "lab_hcsr04_depth",
+      "name": "Lab HC-SR04 Head",
+      "unit": "in",
+      "color": "#26c6da",
+      "area_color": "#2826c6da",
+      "floor_at_zero": false
+    },
+    {
+      "id": "lab_maxbotix_depth_1",
+      "name": "Original Lab MB7389",
+      "unit": "in",
+      "color": "#26a69a",
+      "area_color": "#2826a69a",
+      "floor_at_zero": true
+    },
+    {
+      "id": "lab_maxbotix_depth_2",
+      "name": "New Lab MB7389 B7604",
+      "unit": "in",
+      "color": "#7e57c2",
+      "area_color": "#287e57c2",
+      "floor_at_zero": true
+    },
+    {
+      "id": "lab_moisture_a0",
+      "name": "Lab Soil Moisture A0",
+      "unit": "%",
+      "color": "#8d6e63",
+      "area_color": "#2d8d6e63",
+      "floor_at_zero": true
+    },
+    {
+      "_comment": "Enable after A1 has its own wet/dry calibration and is added to the Pi sensor configuration.",
+      "id": "lab_moisture_a1",
+      "name": "Lab Soil Moisture A1",
+      "unit": "%",
+      "color": "#66bb6a",
+      "area_color": "#2866bb6a",
+      "floor_at_zero": true,
+      "visible": false
+    },
+    {
+      "_comment": "Enable after A2 has its own wet/dry calibration and is added to the Pi sensor configuration.",
+      "id": "lab_moisture_a2",
+      "name": "Lab Soil Moisture A2",
+      "unit": "%",
+      "color": "#ffa726",
+      "area_color": "#28ffa726",
+      "floor_at_zero": true,
+      "visible": false
+    }
+  ]
+}

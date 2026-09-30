@@ -98,6 +98,23 @@ hand; re-run with `-n` afterwards to skip the step.
 ./deploy_dashboard.sh -i ~/keys/ArashLinux.pem
 ```
 
+### Separate lab dashboard
+
+The lab dashboard is deployed under `/lab/` with its own tracked
+`config.lab.json`. It reuses the WebAssembly bundle already installed for the
+field dashboard, so changing the lab sensor list does not require a rebuild and
+does not alter the field page.
+
+```bash
+./deploy_lab_dashboard.sh -i ~/.ssh/ArashLinux.pem
+```
+
+Lab measurement IDs are prefixed with `lab_`. The API stores readings by
+sensor ID and timestamp and has no station column, so this namespace prevents
+field and lab values from being combined in one chart. The lab health page is
+available at `/lab/health.html` and reads its component list from
+`config.lab.json`.
+
 Run it from this directory — it reads the Qt output from
 `build/WebAssembly_Qt_6_8_2_single_threaded-Release/` and the tracked sources
 (`web/index.html`, `config.json`) from here. Both paths are overridable (`-b`,

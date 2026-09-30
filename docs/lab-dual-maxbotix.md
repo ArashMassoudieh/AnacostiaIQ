@@ -4,8 +4,8 @@ The lab station now has two distinct MB7389-100 sensors. They must use separate 
 
 | Sensor | Electrical interface | Pi receive pin | Device | Sensor ID |
 |---|---|---|---|---|
-| Original installed lab unit | 5 V supply and verified 2N3904 inverter | GPIO15, physical pin 10 | `/dev/ttyAMA0` | `maxbotix_depth` |
-| New unit, label B7604 | 3.3 V supply and direct TTL serial | GPIO5, physical pin 29 | `/dev/ttyAMA2` | `maxbotix_depth_2` |
+| Original installed lab unit | 5 V supply and verified 2N3904 inverter | GPIO15, physical pin 10 | `/dev/ttyAMA0` | `lab_maxbotix_depth_1` |
+| New unit, label B7604 | 3.3 V supply and direct TTL serial | GPIO5, physical pin 29 | `/dev/ttyAMA2` | `lab_maxbotix_depth_2` |
 
 Do not join the two serial outputs. The original unit keeps its measured inverter circuit. The new unit uses no inverter or resistors in the planned 3.3 V TTL connection.
 
@@ -56,4 +56,4 @@ scripts/anacostiaiq-health
 python3 -m json.tool ~/.local/state/anacostiaiq/health.json
 ```
 
-Expected components are `sensor_maxbotix_depth` and `sensor_maxbotix_depth_2`.
+Expected components are `sensor_lab_maxbotix_depth_1` and `sensor_lab_maxbotix_depth_2`.
