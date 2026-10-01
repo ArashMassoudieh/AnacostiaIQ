@@ -45,6 +45,13 @@ struct SensorChart {
     QValueAxis    *axisY   = nullptr;
 };
 
+struct SensorDataCache {
+    QJsonArray readings;
+    QDateTime coveredStart;
+    QDateTime coveredEnd;
+    bool initialized = false;
+};
+
 class SensorDashboard : public QMainWindow
 {
     Q_OBJECT
@@ -69,7 +76,16 @@ private:
     void fetchSensorList();
     void fetchAllSensors();
     void fetchSensorData(const QString &sensorId);
-    void onDataReceived(const QString &sensorId, QNetworkReply *reply);
+    void onDataReceived(const QString &sensorId, QNetworkReply *reply,
+                        const QDateTime &displayStart,
+                        const QDateTime &displayEnd,
+                        const QDateTime &fetchStart,
+                        const QDateTime &fetchEnd,
+                        bool replaceCache);
+    QJsonArray readingsInRange(const QString &sensorId,
+                               const QDateTime &start,
+                               const QDateTime &end) const;
+    void completeSensorRequest();
     void updateChart(const QString &sensorId, const QJsonArray &dataArray);
     SensorChart &getOrCreateChart(const QString &sensorId);
     void setStatus(const QString &message);
@@ -106,6 +122,7 @@ private:
 
     // One chart per sensor
     QMap<QString, SensorChart> sensorCharts;
+    QMap<QString, SensorDataCache> sensorDataCache;
 
     // Sensor list (from config; optionally refreshed from the API)
     QStringList sensorIds;

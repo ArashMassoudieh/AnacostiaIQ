@@ -380,23 +380,69 @@ void SensorDashboard::fetchSensorData(const QString &sensorId)
     QUrl url(apiUrl + "/sensor/" + sensorId);
     QUrlQuery query;
 
-    QDateTime startDt = startDateTimeEdit->dateTime();
-    QDateTime endDt   = endDateTimeEdit->dateTime();
+    const QDateTime displayStart = startDateTimeEdit->dateTime();
+    const QDateTime displayEnd   = endDateTimeEdit->dateTime();
 
-    query.addQueryItem("start", startDt.toUTC().toString(Qt::ISODate));
-    query.addQueryItem("end",   endDt.toUTC().toString(Qt::ISODate));
+    // Reuse a complete range already held in this page session. This makes a
+    // repeated Fetch Data click instant and avoids another API transfer.
+    const auto cacheIt = sensorDataCache.constFind(sensorId);
+    if (cacheIt != sensorDataCache.cend() && cacheIt->initialized &&
+        displayStart >= cacheIt->coveredStart &&
+        displayEnd <= cacheIt->coveredEnd) {
+        qDebug() << "Sensor cache hit:" << sensorId
+                 << displayStart << displayEnd;
+        updateChart(sensorId, readingsInRange(sensorId, displayStart, displayEnd));
+        completeSensorRequest();
+        return;
+    }
+
+    QDateTime fetchStart = displayStart;
+    const QDateTime fetchEnd = displayEnd;
+    bool replaceCache = true;
+
+    // Auto-refresh normally keeps the same start and advances only the end.
+    // Fetch just that new tail and merge it into the existing readings.
+    if (cacheIt != sensorDataCache.cend() && cacheIt->initialized &&
+        displayStart >= cacheIt->coveredStart &&
+        displayEnd > cacheIt->coveredEnd) {
+        fetchStart = cacheIt->coveredEnd;
+        replaceCache = false;
+        qDebug() << "Incremental sensor fetch:" << sensorId
+                 << fetchStart << fetchEnd;
+    } else {
+        qDebug() << "Full sensor fetch:" << sensorId
+                 << fetchStart << fetchEnd;
+    }
+
+    // The deployed API stores its DynamoDB sort-key timestamps as local,
+    // timezone-free ISO strings (for example 2026-09-30T15:00:03). Sending
+    // these controls through toUTC() shifts a selected Eastern-time range by
+    // four or five hours and can make a valid historical window look empty.
+    // Preserve the wall-clock values shown in the dashboard and match the
+    // server's stored timestamp format exactly.
+    const QString apiTimestampFormat = "yyyy-MM-dd'T'HH:mm:ss";
+    query.addQueryItem("start", fetchStart.toString(apiTimestampFormat));
+    query.addQueryItem("end",   fetchEnd.toString(apiTimestampFormat));
     url.setQuery(query);
 
     QNetworkRequest request(url);
 
     QNetworkReply *reply = networkManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, sensorId, reply]() {
-        onDataReceived(sensorId, reply);
+    connect(reply, &QNetworkReply::finished, this,
+            [this, sensorId, reply, displayStart, displayEnd,
+             fetchStart, fetchEnd, replaceCache]() {
+        onDataReceived(sensorId, reply, displayStart, displayEnd,
+                       fetchStart, fetchEnd, replaceCache);
     });
 }
 
 void SensorDashboard::onDataReceived(const QString &sensorId,
-                                     QNetworkReply *reply)
+                                     QNetworkReply *reply,
+                                     const QDateTime &displayStart,
+                                     const QDateTime &displayEnd,
+                                     const QDateTime &fetchStart,
+                                     const QDateTime &fetchEnd,
+                                     bool replaceCache)
 {
     if (!reply) return;
 
@@ -413,15 +459,72 @@ void SensorDashboard::onDataReceived(const QString &sensorId,
                 dataArray = obj["readings"].toArray();
         }
 
-        updateChart(sensorId, dataArray);
+        SensorDataCache &cache = sensorDataCache[sensorId];
+        QMap<QString, QJsonObject> readingsByTimestamp;
+
+        if (!replaceCache && cache.initialized) {
+            for (const QJsonValue &value : cache.readings) {
+                const QJsonObject reading = value.toObject();
+                const QString timestamp = reading.value("timestamp").toString();
+                if (!timestamp.isEmpty())
+                    readingsByTimestamp.insert(timestamp, reading);
+            }
+        }
+
+        for (const QJsonValue &value : dataArray) {
+            const QJsonObject reading = value.toObject();
+            const QString timestamp = reading.value("timestamp").toString();
+            if (!timestamp.isEmpty())
+                readingsByTimestamp.insert(timestamp, reading);
+        }
+
+        cache.readings = QJsonArray();
+        for (auto it = readingsByTimestamp.cbegin();
+             it != readingsByTimestamp.cend(); ++it)
+            cache.readings.append(it.value());
+
+        if (replaceCache || !cache.initialized) {
+            cache.coveredStart = fetchStart;
+            cache.coveredEnd = fetchEnd;
+        } else {
+            if (fetchStart < cache.coveredStart)
+                cache.coveredStart = fetchStart;
+            if (fetchEnd > cache.coveredEnd)
+                cache.coveredEnd = fetchEnd;
+        }
+        cache.initialized = true;
+
+        updateChart(sensorId, readingsInRange(sensorId, displayStart, displayEnd));
     } else {
         qDebug() << "Error fetching" << sensorId << ":" << reply->errorString();
-        QJsonArray empty;
-        updateChart(sensorId, empty);
+        if (sensorDataCache.value(sensorId).initialized)
+            updateChart(sensorId, readingsInRange(sensorId, displayStart, displayEnd));
+        else
+            updateChart(sensorId, QJsonArray());
     }
 
     reply->deleteLater();
 
+    completeSensorRequest();
+}
+
+QJsonArray SensorDashboard::readingsInRange(const QString &sensorId,
+                                            const QDateTime &start,
+                                            const QDateTime &end) const
+{
+    QJsonArray filtered;
+    const SensorDataCache cache = sensorDataCache.value(sensorId);
+    for (const QJsonValue &value : cache.readings) {
+        const QDateTime timestamp = QDateTime::fromString(
+            value.toObject().value("timestamp").toString(), Qt::ISODate);
+        if (timestamp.isValid() && timestamp >= start && timestamp <= end)
+            filtered.append(value);
+    }
+    return filtered;
+}
+
+void SensorDashboard::completeSensorRequest()
+{
     pendingRequests--;
     if (pendingRequests <= 0) {
         setStatus(QString("All sensors loaded — %1")
