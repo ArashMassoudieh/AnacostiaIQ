@@ -55,6 +55,10 @@ public:
 
     // ── Global settings ─────────────────────────────────────────
     QString apiUrl() const            { return m_apiUrl; }
+    // Project namespace. Sent as ?project=... on every API call so the
+    // dashboard only charts one project's sensors. Empty means the
+    // pre-project behaviour: unnamespaced (legacy) readings.
+    QString project() const           { return m_project; }
     int     refreshIntervalSec() const{ return m_refreshSec; }
     int     defaultRangeDaysBack() const  { return m_rangeBack; }
     int     defaultRangeDaysAhead() const { return m_rangeAhead; }
@@ -88,6 +92,7 @@ private:
 
     // Global settings (with built-in defaults)
     QString m_apiUrl       = "http://54.213.147.59:5000";
+    QString m_project;
     int     m_refreshSec   = 60;
     int     m_rangeBack    = 7;
     int     m_rangeAhead   = 7;

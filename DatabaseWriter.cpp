@@ -42,6 +42,11 @@ DatabaseWriter::DatabaseWriter(QObject *parent)
     }
 }
 
+void DatabaseWriter::setProject(const QString &project)
+{
+    m_project = project.trimmed();
+}
+
 void DatabaseWriter::setApiUrl(const QString &url)
 {
     apiUrl = QUrl(url);
@@ -253,6 +258,11 @@ void DatabaseWriter::sendReading(const QString &sensorId, double value,
 {
     QJsonObject json;
     json["sensor_id"] = sensorId;
+    // Namespaces the reading server-side. Omitted when empty so the payload
+    // stays byte-identical to the pre-project format -- which also keeps
+    // queueRecordKey() stable for readings already spooled on disk.
+    if (!m_project.isEmpty())
+        json["project"] = m_project;
     json["value"] = QString::number(value, 'f', 2).toDouble();
     json["unit"] = unit;
 

@@ -84,6 +84,7 @@ void HeadlessMonitor::loadConfiguration() {
     pollInterval     = config.pollIntervalSeconds();
     weatherInterval = config.weatherIntervalSeconds();
     dbWriter.setApiUrl(config.apiUrl());
+    dbWriter.setProject(config.project());
 
     adaptiveEnabled = config.adaptiveEnabled();
     idleFactor      = config.idleIntervalFactor();

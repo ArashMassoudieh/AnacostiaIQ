@@ -33,6 +33,13 @@ public:
 
     void setApiUrl(const QString &url);
 
+    // Project namespace sent with every reading. The API stores the
+    // partition key as "<project>#<sensor_id>", so stations in different
+    // projects may reuse sensor ids. Empty posts unnamespaced, matching
+    // pre-project behaviour.
+    void setProject(const QString &project);
+    QString project() const { return m_project; }
+
     void sendReading(const QString &sensorId, double value,
                      const QString &unit, const QDateTime &timestamp = QDateTime());
 
@@ -62,6 +69,7 @@ private:
 
     QList<QJsonObject> pending;
     QSet<QByteArray> pendingKeys;
+    QString m_project;
     QString queuePath;
     QString acknowledgementPath;
     QTimer retryTimer;

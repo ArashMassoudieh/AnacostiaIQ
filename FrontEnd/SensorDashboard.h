@@ -130,6 +130,7 @@ private:
     // Network
     QNetworkAccessManager *networkManager;
     QString apiUrl;
+    QString project;   // namespace sent as ?project= on API calls
     int pendingRequests;
 
     // Auto-refresh

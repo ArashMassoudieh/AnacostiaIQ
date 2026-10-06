@@ -146,6 +146,7 @@ bool DashboardConfig::loadFromData(const QByteArray &bytes)
     // ── Global settings ─────────────────────────────────────────
     if (root.contains("api_url"))
         m_apiUrl = root.value("api_url").toString(m_apiUrl);
+        m_project = root.value("project").toString(m_project);
     if (root.contains("refresh_interval_sec"))
         m_refreshSec = root.value("refresh_interval_sec").toInt(m_refreshSec);
     if (root.contains("auto_refresh"))

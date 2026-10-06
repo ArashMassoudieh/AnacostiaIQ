@@ -61,6 +61,7 @@ void SensorDashboard::fetchConfig()
 void SensorDashboard::finishInitialization()
 {
     apiUrl             = config.apiUrl();
+    project            = config.project();
     refreshIntervalSec = config.refreshIntervalSec();
 
     // ── Seed the sensor list from config. If the config pinned an
@@ -327,6 +328,11 @@ void SensorDashboard::onAutoRefreshTimeout()
 void SensorDashboard::fetchSensorList()
 {
     QUrl url(apiUrl + "/sensors");
+    if (!project.isEmpty()) {
+        QUrlQuery listQuery;
+        listQuery.addQueryItem("project", project);
+        url.setQuery(listQuery);
+    }
     QNetworkRequest request(url);
 
     qDebug() << "Fetching sensor list from" << url.toString();
@@ -423,6 +429,10 @@ void SensorDashboard::fetchSensorData(const QString &sensorId)
     const QString apiTimestampFormat = "yyyy-MM-dd'T'HH:mm:ss";
     query.addQueryItem("start", fetchStart.toString(apiTimestampFormat));
     query.addQueryItem("end",   fetchEnd.toString(apiTimestampFormat));
+    // Without this the API serves legacy (unnamespaced) rows, so a project
+    // dashboard would silently chart another project's data.
+    if (!project.isEmpty())
+        query.addQueryItem("project", project);
     url.setQuery(query);
 
     QNetworkRequest request(url);

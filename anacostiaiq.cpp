@@ -63,6 +63,7 @@ void AnacostiaIQ::loadConfiguration()
         weatherInterval = config.weatherIntervalSeconds();
         barrelDepth     = config.barrelDepthCm();
         dbWriter.setApiUrl(config.apiUrl());
+        dbWriter.setProject(config.project());
 
         // Adaptive polling
         adaptiveEnabled = config.adaptiveEnabled();

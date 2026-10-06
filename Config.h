@@ -33,6 +33,15 @@ public:
     double  barrelDepthCm() const       { return m_barrelDepth; }
     QString apiUrl() const              { return m_apiUrl; }
 
+    // Project namespace for the shared cloud database. The API stores
+    // readings under "<project>#<sensor_id>", so two projects may reuse
+    // sensor ids without overwriting one another. Empty means post
+    // unnamespaced, which is what pre-project configs did.
+    QString project() const {
+        return QJsonDocument::fromJson(m_raw)
+                   .object().value("project").toString();
+    }
+
     // Stable station identity used to namespace remote health telemetry.
     // Read from retained JSON so older configs remain valid.
     QString stationId() const {
