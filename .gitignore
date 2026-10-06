@@ -106,3 +106,9 @@ moc_predefs.h
 /config.json.before-*
 
 FrontEnd/build/WebAssembly_Qt_6_9_1_singlethread-Release/
+
+# LaTeX build artefacts
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc

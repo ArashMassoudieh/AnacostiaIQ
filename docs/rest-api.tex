@@ -1,0 +1,439 @@
+% AnacostiaIQ Sensor REST API — reference
+% Build:  pdflatex rest-api.tex   (twice, for the table of contents)
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{codebg}{HTML}{F6F6F4}
+\definecolor{codekw}{HTML}{2A78D6}
+\definecolor{codestr}{HTML}{1BAF7A}
+\definecolor{codecom}{HTML}{52514E}
+\definecolor{warnbg}{HTML}{FDF3E7}
+
+\lstdefinestyle{shell}{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  frame=single, framerule=0pt, framesep=6pt,
+  breaklines=true, breakatwhitespace=false,
+  postbreak=\mbox{\textcolor{codecom}{$\hookrightarrow$}\space},
+  columns=fullflexible, keepspaces=true,
+  showstringspaces=false,
+  commentstyle=\color{codecom}\itshape,
+}
+\lstdefinestyle{js}{
+  style=shell,
+  language=Java,
+  keywordstyle=\color{codekw}\bfseries,
+  stringstyle=\color{codestr},
+  morekeywords={const,let,async,await,function,return,for,of,if,else,new,try,catch,throw},
+}
+\lstset{style=shell}
+
+\newcommand{\http}[2]{\texttt{\textbf{#1}}~\texttt{#2}}
+
+\title{\textbf{AnacostiaIQ Sensor REST API}\\[2mm]
+       \large Reference and command syntax}
+\author{}
+\date{Generated 6 October 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\bigskip
+
+%===============================================================
+\section{Overview}
+
+A Flask service stores sensor readings in Amazon DynamoDB and serves them
+over HTTP. Field stations \texttt{POST} readings; the dashboard and any
+other client \texttt{GET} them.
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Base URL        & \texttt{http://54.213.147.59:5000} \\
+Host            & \texttt{ec2-54-213-147-59.us-west-2.compute.amazonaws.com} \\
+Service         & \texttt{sensor-api.service} (systemd), \texttt{\textasciitilde/sensor-api/app.py} \\
+Storage         & DynamoDB table \texttt{sensor\_readings}, region \texttt{us-west-2} \\
+Content type    & \texttt{application/json} \\
+CORS            & enabled for all origins \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Data model}
+
+Each reading is one item:
+
+\begin{center}
+\begin{tabular}{@{}llp{7.6cm}@{}}
+\toprule
+Field & Type & Meaning \\
+\midrule
+\texttt{project}   & string & Namespace. Groups one deployment's stations. \\
+\texttt{sensor\_id}& string & Sensor name, unique \emph{within} a project. \\
+\texttt{timestamp} & string & ISO~8601, \texttt{YYYY-MM-DDTHH:MM:SS}. Sort key. \\
+\texttt{value}     & string & Always stored and returned as a \emph{string}. \\
+\texttt{unit}      & string & Free text, e.g. \texttt{m}, \texttt{\%}, \texttt{mm}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{How projects work}
+
+\label{sec:projects}
+The DynamoDB partition key is \texttt{sensor\_id} and the sort key is
+\texttt{timestamp}, so a given pair identifies exactly one item. Without
+namespacing, two projects posting the same sensor name at the same instant
+would overwrite each other silently.
+
+The API therefore stores the partition key as
+\texttt{<project>\#<sensor\_id>} and splits it apart again on read. Clients
+only ever see \texttt{project} and \texttt{sensor\_id} as separate fields;
+the \texttt{\#} encoding never appears on the wire.
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{project} must not contain \texttt{\#}. A request that
+        breaks this is rejected with \texttt{400}.
+  \item Omitting \texttt{project} reads and writes the \emph{unnamespaced}
+        space, which is what the API did before projects existed.
+  \item \texttt{value} is stored by \texttt{str()}, so \texttt{42.5} comes
+        back as \texttt{"42.5"}. Cast on the client.
+  \item A \texttt{POST} to an existing \texttt{(project, sensor\_id,
+        timestamp)} \textbf{overwrites} it. That is the only way to correct
+        a reading --- there is no \texttt{PUT} or \texttt{PATCH}.
+\end{itemize}
+
+%===============================================================
+\section{Endpoints}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Method & Path & Purpose \\
+\midrule
+\texttt{GET}    & \texttt{/health}            & liveness check \\
+\texttt{POST}   & \texttt{/sensor}            & store one reading \\
+\texttt{GET}    & \texttt{/sensor/<id>}       & read a sensor's readings \\
+\texttt{DELETE} & \texttt{/sensor/<id>}       & delete readings (token required) \\
+\texttt{GET}    & \texttt{/sensors}           & list sensor ids \\
+\texttt{GET}    & \texttt{/projects}          & list project names \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent There is no authentication on reads or writes. Only
+\texttt{DELETE} is gated, by the \texttt{X-Wipe-Token} header.
+
+%---------------------------------------------------------------
+\subsection{\http{GET}{/health}}
+
+Returns \texttt{\{"status":"ok"\}} if the service is up.
+
+\begin{lstlisting}
+curl http://54.213.147.59:5000/health
+\end{lstlisting}
+
+%---------------------------------------------------------------
+\subsection{\http{POST}{/sensor}}
+
+Stores one reading. Body fields:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Field & Required & Default \\
+\midrule
+\texttt{sensor\_id} & yes & --- \\
+\texttt{value}      & yes & --- \\
+\texttt{project}    & no  & none (unnamespaced) \\
+\texttt{unit}       & no  & \texttt{""} \\
+\texttt{timestamp}  & no  & server UTC time \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}
+curl -X POST http://54.213.147.59:5000/sensor \
+     -H 'Content-Type: application/json' \
+     -d '{"project":"John-McCormack",
+          "sensor_id":"lab_moisture_a0",
+          "value":42.5,
+          "unit":"%",
+          "timestamp":"2026-10-06T19:00:00"}'
+\end{lstlisting}
+
+\noindent Letting the server supply the timestamp:
+
+\begin{lstlisting}
+curl -X POST http://54.213.147.59:5000/sensor \
+     -H 'Content-Type: application/json' \
+     -d '{"project":"John-McCormack","sensor_id":"lab_moisture_a0","value":42.5,"unit":"%"}'
+\end{lstlisting}
+
+\noindent Responses: \texttt{200} \texttt{\{"status":"success"\}};
+\texttt{400} if \texttt{project} contains \texttt{\#}.
+
+%---------------------------------------------------------------
+\subsection{\http{GET}{/sensor/<sensor\_id>}}
+
+Returns an array of readings, oldest first.
+
+\begin{center}
+\begin{tabular}{@{}lp{10.4cm}@{}}
+\toprule
+Query parameter & Meaning \\
+\midrule
+\texttt{project} & restrict to one project; omit for unnamespaced data \\
+\texttt{start}   & inclusive lower bound on \texttt{timestamp} \\
+\texttt{end}     & inclusive upper bound on \texttt{timestamp} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \texttt{start} and \texttt{end} are compared as \emph{strings}
+against the ISO timestamp, so a prefix such as \texttt{2026-10} works, but
+the format must match the stored one. Either may be given alone.
+
+\begin{lstlisting}
+# everything for one sensor in one project
+curl "http://54.213.147.59:5000/sensor/lab_moisture_a0?project=John-McCormack"
+
+# a date range
+curl "http://54.213.147.59:5000/sensor/lab_moisture_a0?project=John-McCormack&start=2026-10-01&end=2026-10-07"
+
+# everything since a moment
+curl "http://54.213.147.59:5000/sensor/lab_moisture_a0?project=John-McCormack&start=2026-10-06T00:00:00"
+
+# pretty-printed
+curl -s "http://54.213.147.59:5000/sensor/precip_amount?project=John-McCormack" | python3 -m json.tool
+\end{lstlisting}
+
+\noindent Example response:
+
+\begin{lstlisting}
+[{"project":"John-McCormack","sensor_id":"lab_moisture_a0",
+  "timestamp":"2026-10-06T19:00:00","unit":"%","value":"42.5"}]
+\end{lstlisting}
+
+%---------------------------------------------------------------
+\subsection{\http{GET}{/sensors}}
+
+Lists sensor ids. With \texttt{?project=} only that project's sensors;
+without it, every sensor in every project.
+
+\begin{lstlisting}
+curl "http://54.213.147.59:5000/sensors?project=John-McCormack"
+curl "http://54.213.147.59:5000/sensors"
+\end{lstlisting}
+
+\noindent This performs a full table scan, so it grows more expensive as
+the table does.
+
+%---------------------------------------------------------------
+\subsection{\http{GET}{/projects}}
+
+Lists distinct project names. A \texttt{null} entry means readings that
+carry no project.
+
+\begin{lstlisting}
+curl http://54.213.147.59:5000/projects
+\end{lstlisting}
+
+%---------------------------------------------------------------
+\subsection{\http{DELETE}{/sensor/<sensor\_id>}}
+
+\begin{center}\fcolorbox{black}{warnbg}{\parbox{0.93\textwidth}{\textbf{Destructive.}
+Requires the \texttt{X-Wipe-Token} header. Omitting both \texttt{start} and
+\texttt{end} deletes \emph{every} reading for that sensor in that project.
+Without a token configured server-side, deletion is refused outright.}}\end{center}
+
+\medskip
+Accepts the same \texttt{project}, \texttt{start} and \texttt{end}
+parameters as the \texttt{GET}, and returns the number removed.
+
+\begin{lstlisting}
+# one sensor, one project, a bounded range
+curl -X DELETE "http://54.213.147.59:5000/sensor/lab_moisture_a0?project=John-McCormack&start=2026-10-01&end=2026-10-02" \
+     -H "X-Wipe-Token: $WIPE_TOKEN"
+
+# every reading for that sensor in that project
+curl -X DELETE "http://54.213.147.59:5000/sensor/lab_moisture_a0?project=John-McCormack" \
+     -H "X-Wipe-Token: $WIPE_TOKEN"
+\end{lstlisting}
+
+\noindent Responses: \texttt{200}
+\texttt{\{"status":"success","sensor\_id":...,"deleted":N\}};
+\texttt{401} \texttt{\{"error":"unauthorized"\}}.
+
+The token lives in the service environment on the server:
+
+\begin{lstlisting}
+sudo systemctl show -p Environment --value sensor-api
+\end{lstlisting}
+
+%===============================================================
+\section{JavaScript}
+
+All examples use \texttt{fetch}, and work in a browser or in Node~18+.
+
+\subsection{Posting a reading}
+\begin{lstlisting}[style=js]
+const API = "http://54.213.147.59:5000";
+const PROJECT = "John-McCormack";
+
+async function postReading(sensorId, value, unit) {
+  const res = await fetch(`${API}/sensor`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      project: PROJECT,
+      sensor_id: sensorId,
+      value: value,
+      unit: unit,
+      timestamp: new Date().toISOString().slice(0, 19)  // no trailing Z
+    })
+  });
+  if (!res.ok) throw new Error(`POST failed: ${res.status}`);
+  return res.json();
+}
+\end{lstlisting}
+
+\subsection{Reading a range}
+\begin{lstlisting}[style=js]
+async function getReadings(sensorId, start, end) {
+  const q = new URLSearchParams({ project: PROJECT });
+  if (start) q.set("start", start);
+  if (end)   q.set("end", end);
+
+  const res = await fetch(`${API}/sensor/${encodeURIComponent(sensorId)}?${q}`);
+  if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+
+  const rows = await res.json();
+  // value arrives as a string -- cast before plotting
+  return rows.map(r => ({ t: new Date(r.timestamp), v: parseFloat(r.value) }));
+}
+
+const series = await getReadings("lab_moisture_a0",
+                                 "2026-10-01", "2026-10-07");
+\end{lstlisting}
+
+\subsection{Listing sensors and projects}
+\begin{lstlisting}[style=js]
+const sensors  = await (await fetch(`${API}/sensors?project=${PROJECT}`)).json();
+const projects = await (await fetch(`${API}/projects`)).json();
+// projects may contain null, meaning readings with no project
+\end{lstlisting}
+
+\subsection{Deleting (token required)}
+\begin{lstlisting}[style=js]
+async function deleteReadings(sensorId, token, start, end) {
+  const q = new URLSearchParams({ project: PROJECT });
+  if (start) q.set("start", start);
+  if (end)   q.set("end", end);
+
+  const res = await fetch(`${API}/sensor/${encodeURIComponent(sensorId)}?${q}`, {
+    method: "DELETE",
+    headers: { "X-Wipe-Token": token }
+  });
+  if (res.status === 401) throw new Error("unauthorized -- bad or missing token");
+  return res.json();   // { status, sensor_id, project, deleted }
+}
+\end{lstlisting}
+
+%===============================================================
+\section{Operations}
+
+\subsection{Server access}
+\begin{lstlisting}
+ssh -i ~/Dropbox/AWS_/ArashLinux.pem ubuntu@54.213.147.59
+\end{lstlisting}
+
+\subsection{Service control}
+\begin{lstlisting}
+systemctl status sensor-api
+sudo systemctl restart sensor-api
+journalctl -u sensor-api -f
+\end{lstlisting}
+
+\subsection{Backing up the table}
+\begin{lstlisting}
+~/sensor-api/venv/bin/python3 - <<'PY'
+import boto3, gzip, json, datetime
+t = boto3.resource("dynamodb", region_name="us-west-2").Table("sensor_readings")
+path = "backup-%s.json.gz" % datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+kw, n = {}, 0
+with gzip.open(path, "wt") as fh:
+    while True:
+        r = t.scan(**kw)
+        for it in r["Items"]:
+            fh.write(json.dumps({k: str(v) for k, v in it.items()}) + "\n"); n += 1
+        if "LastEvaluatedKey" not in r: break
+        kw["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+print(path, n, "items")
+PY
+\end{lstlisting}
+
+\subsection{Acceptance tests}
+\begin{lstlisting}
+python3 scripts/test_project_api.py
+python3 scripts/test_project_api.py --token "$WIPE_TOKEN"   # adds DELETE tests
+\end{lstlisting}
+
+%===============================================================
+\section{Client configuration}
+
+The \texttt{project} value must agree on both sides, or the dashboard
+charts nothing.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Side & File & Key \\
+\midrule
+Station (Pi) & \texttt{config.json}          & \texttt{"project"} (top level) \\
+Dashboard    & \texttt{FrontEnd/config.json} & \texttt{"project"} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}
+{
+  "project": "John-McCormack",
+  "station": { "id": "field_station_01", "name": "John McCormack Field Station" },
+  "app": { "apiUrl": "http://54.213.147.59:5000/sensor" }
+}
+\end{lstlisting}
+
+\noindent \texttt{project} groups stations; \texttt{station.id} still
+distinguishes them within it.
+
+%===============================================================
+\section{Known limitations}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{No authentication on reads or writes.} Port 5000 is open to
+        the world and only \texttt{DELETE} checks a token. Anyone who can
+        reach the host can post arbitrary readings or read everything.
+  \item \textbf{No update endpoint.} Correcting a value means re-posting
+        the same key, which overwrites.
+  \item \textbf{\texttt{value} is a string.} Clients must cast.
+  \item \textbf{\texttt{/sensors} and \texttt{/projects} scan the table.}
+        Cost grows with table size; cache the result rather than polling.
+  \item \textbf{Timestamps are compared lexicographically.} Mixing formats
+        (with and without a trailing \texttt{Z}) breaks range queries.
+        Post \texttt{YYYY-MM-DDTHH:MM:SS}.
+  \item \textbf{Forecast and observation share the table.} Weather sensors
+        such as \texttt{precip\_amount} carry future timestamps.
+\end{enumerate}
+
+\end{document}

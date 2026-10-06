@@ -1,7 +1,7 @@
 {
   "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets. Each sensor (and weather) may set its own 'intervalSeconds'; omit it to use app.pollIntervalSeconds. Each sensor may also set 'samplesPerReading': one reported reading is then the mean of that many samples taken back to back (failed samples are dropped, and 60 ms separates consecutive ones). Omit it for 1, i.e. no averaging. Raising it lengthens the blocking read proportionally, so keep intervalSeconds well above samplesPerReading x the time one sample takes.",
   "_projectComment": "Namespaces this station's data in the shared cloud database. The API stores readings under \"<project>#<sensor_id>\", so two projects may use identical sensor ids without overwriting each other. Omit or leave empty to post unnamespaced (legacy) readings.",
-  "project": "anacostia",
+  "project": "John-McCormack",
 
   "station": {
     "id": "lab_station_01",
