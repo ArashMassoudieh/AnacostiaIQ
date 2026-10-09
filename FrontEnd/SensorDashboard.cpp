@@ -2,6 +2,8 @@
 #include <QLinearGradient>
 #include <QGraphicsDropShadowEffect>
 #include <QFont>
+#include <QPixmap>
+#include <QUrlQuery>
 #include <limits>
 
 SensorDashboard::SensorDashboard(const QString &configPath, QWidget *parent)
@@ -95,7 +97,19 @@ void SensorDashboard::finishInitialization()
     });
     countdownSeconds = refreshIntervalSec;
 
+    if (config.cameraEnabled()) {
+        cameraRefreshTimer = new QTimer(this);
+        cameraRefreshTimer->setInterval(30000);
+        connect(cameraRefreshTimer, &QTimer::timeout,
+                this, &SensorDashboard::fetchCameraState);
+    }
+
     setupUI();
+
+    if (config.cameraEnabled()) {
+        fetchCameraState();
+        cameraRefreshTimer->start();
+    }
 
     // Create chart widgets in configured order before asynchronous network
     // replies arrive. Creating them from reply callbacks lets whichever
@@ -176,6 +190,14 @@ void SensorDashboard::setupUI()
             padding: 5px 10px;
             font-size: 13px;
         }
+        QComboBox {
+            background-color: #2b3038;
+            color: #e0e0e0;
+            border: 1px solid #3a3f47;
+            border-radius: 6px;
+            padding: 6px 12px;
+            min-width: 120px;
+        }
         QDateTimeEdit::drop-down {
             border: none;
             width: 20px;
@@ -254,6 +276,41 @@ void SensorDashboard::setupUI()
     controlRow->addWidget(countdownLabel);
     controlRow->addStretch();
 
+    if (config.cameraEnabled()) {
+        cameraGroup = new QGroupBox(config.cameraTitle(), this);
+        QVBoxLayout *cameraLayout = new QVBoxLayout(cameraGroup);
+        QHBoxLayout *cameraControls = new QHBoxLayout();
+        cameraImage = new QLabel("Waiting for the first camera image…", this);
+        cameraImage->setAlignment(Qt::AlignCenter);
+        cameraImage->setMinimumHeight(260);
+        cameraImage->setMaximumHeight(460);
+        cameraImage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        cameraImage->setStyleSheet(
+            "background:#15181d; border:1px solid #343a42; border-radius:8px;");
+        cameraStatus = new QLabel("Loading camera status…", this);
+        cameraSchedule = new QComboBox(this);
+        cameraSchedule->addItem("Off", 0);
+        cameraSchedule->addItem("Every 1 hour", 1);
+        cameraSchedule->addItem("Every 6 hours", 6);
+        cameraSchedule->addItem("Every 12 hours", 12);
+        cameraSchedule->addItem("Every 24 hours", 24);
+        cameraScheduleButton = new QPushButton("Save schedule", this);
+        cameraCaptureButton = new QPushButton("Capture now", this);
+        cameraControls->addWidget(new QLabel("Automatic capture:", this));
+        cameraControls->addWidget(cameraSchedule);
+        cameraControls->addWidget(cameraScheduleButton);
+        cameraControls->addSpacing(16);
+        cameraControls->addWidget(cameraCaptureButton);
+        cameraControls->addStretch();
+        cameraControls->addWidget(cameraStatus);
+        cameraLayout->addLayout(cameraControls);
+        cameraLayout->addWidget(cameraImage, 1);
+        connect(cameraCaptureButton, &QPushButton::clicked,
+                this, &SensorDashboard::requestCameraCapture);
+        connect(cameraScheduleButton, &QPushButton::clicked,
+                this, &SensorDashboard::saveCameraSchedule);
+    }
+
     // === Charts Area ===
     chartsContainer = new QWidget();
     chartsContainer->setStyleSheet("background-color: transparent;");
@@ -270,10 +327,14 @@ void SensorDashboard::setupUI()
         scrollArea->setWidget(chartsContainer);
 
         mainLayout->addWidget(controlGroup);
+        if (cameraGroup)
+            mainLayout->addWidget(cameraGroup);
         mainLayout->addWidget(scrollArea, 1);
     } else {
         chartsLayout->setSpacing(4);
         mainLayout->addWidget(controlGroup);
+        if (cameraGroup)
+            mainLayout->addWidget(cameraGroup);
         mainLayout->addWidget(chartsContainer, 1);
     }
 
@@ -319,6 +380,142 @@ void SensorDashboard::onAutoRefreshTimeout()
         QDateTime::currentDateTime().addDays(config.defaultRangeDaysAhead()));
     fetchAllSensors();
     countdownSeconds = refreshIntervalSec;
+}
+
+// ================================================================
+//  Network — optional lab camera
+// ================================================================
+
+void SensorDashboard::fetchCameraState()
+{
+    if (!config.cameraEnabled())
+        return;
+    QUrl url(apiUrl + "/camera/" + config.cameraStationId() + "/state");
+    QNetworkReply *reply = networkManager->get(QNetworkRequest(url));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (doc.isObject())
+                updateCameraState(doc.object());
+        } else if (cameraStatus) {
+            cameraStatus->setText("Camera server unavailable");
+        }
+        reply->deleteLater();
+    });
+}
+
+void SensorDashboard::requestCameraCapture()
+{
+    if (!config.cameraEnabled())
+        return;
+    cameraCaptureButton->setEnabled(false);
+    cameraStatus->setText("Capture requested…");
+    QUrl url(apiUrl + "/camera/" + config.cameraStationId() + "/request");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QNetworkReply *reply = networkManager->post(request, QByteArray("{}"));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        cameraCaptureButton->setEnabled(true);
+        const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (reply->error() == QNetworkReply::NoError && doc.isObject()) {
+            updateCameraState(doc.object());
+            cameraStatus->setText("Capture queued — waiting for the Pi…");
+            QTimer::singleShot(3000, this, &SensorDashboard::fetchCameraState);
+        } else {
+            cameraStatus->setText("Could not request capture");
+        }
+        reply->deleteLater();
+    });
+}
+
+void SensorDashboard::saveCameraSchedule()
+{
+    if (!config.cameraEnabled())
+        return;
+    const int hours = cameraSchedule->currentData().toInt();
+    cameraScheduleButton->setEnabled(false);
+    QUrl url(apiUrl + "/camera/" + config.cameraStationId() + "/schedule");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    const QByteArray payload = QJsonDocument(
+        QJsonObject{{"hours", hours}}).toJson(QJsonDocument::Compact);
+    QNetworkReply *reply = networkManager->sendCustomRequest(
+        request, QByteArray("PUT"), payload);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, hours]() {
+        cameraScheduleButton->setEnabled(true);
+        const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (reply->error() == QNetworkReply::NoError && doc.isObject()) {
+            updateCameraState(doc.object());
+            cameraStatus->setText(hours == 0 ? "Automatic capture is off"
+                                             : QString("Capturing every %1 h").arg(hours));
+        } else {
+            cameraStatus->setText("Could not save camera schedule");
+        }
+        reply->deleteLater();
+    });
+}
+
+void SensorDashboard::updateCameraState(const QJsonObject &state)
+{
+    const int hours = state.value("schedule_hours").toInt(6);
+    const int scheduleIndex = cameraSchedule->findData(hours);
+    if (scheduleIndex >= 0)
+        cameraSchedule->setCurrentIndex(scheduleIndex);
+
+    const QJsonObject requestState = state.value("request").toObject();
+    const QJsonObject latest = state.value("latest").toObject();
+    const bool capturePending = requestState.value("status").toString() == "pending";
+    if (capturePending)
+        QTimer::singleShot(3000, this, &SensorDashboard::fetchCameraState);
+    if (latest.isEmpty()) {
+        cameraStatus->setText(capturePending
+                              ? "Capture queued — waiting for the Pi…"
+                              : "No camera image uploaded yet");
+        return;
+    }
+
+    const QString capturedAt = latest.value("captured_at").toString();
+    const QDateTime captured = QDateTime::fromString(capturedAt, Qt::ISODate);
+    QString status = captured.isValid()
+        ? QString("Latest: %1").arg(captured.toLocalTime().toString("MMM d, h:mm:ss AP"))
+        : QString("Latest image available");
+    if (capturePending)
+        status += " · new capture queued";
+    cameraStatus->setText(status);
+
+    const QString captureId = latest.value("capture_id").toString();
+    if (!captureId.isEmpty() && captureId == cameraCaptureId)
+        return;
+    cameraCaptureId = captureId;
+
+    QUrl imageUrl(latest.value("image_url").toString());
+    if (imageUrl.isRelative()) {
+        QUrl publicBase(apiUrl);
+        publicBase.setPort(-1);
+        publicBase.setPath("/");
+        publicBase.setQuery(QString());
+        imageUrl = publicBase.resolved(imageUrl);
+    }
+    QUrlQuery cacheBust(imageUrl);
+    cacheBust.addQueryItem("capture", captureId);
+    imageUrl.setQuery(cacheBust);
+    fetchCameraImage(imageUrl);
+}
+
+void SensorDashboard::fetchCameraImage(const QUrl &url)
+{
+    QNetworkReply *reply = networkManager->get(QNetworkRequest(url));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QPixmap pixmap;
+            if (pixmap.loadFromData(reply->readAll(), "JPG")) {
+                cameraImage->setPixmap(pixmap.scaled(
+                    cameraImage->size(), Qt::KeepAspectRatio,
+                    Qt::SmoothTransformation));
+            }
+        }
+        reply->deleteLater();
+    });
 }
 
 // ================================================================

@@ -112,3 +112,7 @@ docs/*.aux
 docs/*.log
 docs/*.out
 docs/*.toc
+
+# Python bytecode
+__pycache__/
+*.py[cod]

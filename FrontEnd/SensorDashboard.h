@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDateTimeEdit>
 #include <QTimer>
 #include <QStatusBar>
@@ -68,6 +69,9 @@ private slots:
     void onAutoRefreshToggled(bool checked);
     void onAutoRefreshTimeout();
     void onSensorListReceived(QNetworkReply *reply);
+    void fetchCameraState();
+    void requestCameraCapture();
+    void saveCameraSchedule();
 
 private:
     void fetchConfig();
@@ -89,6 +93,8 @@ private:
     void updateChart(const QString &sensorId, const QJsonArray &dataArray);
     SensorChart &getOrCreateChart(const QString &sensorId);
     void setStatus(const QString &message);
+    void updateCameraState(const QJsonObject &state);
+    void fetchCameraImage(const QUrl &url);
 
     // Display helpers — now thin wrappers over DashboardConfig so the
     // chart-building code reads the same as before.
@@ -114,6 +120,16 @@ private:
     QPushButton *fetchButton;
     QCheckBox *autoRefreshCheckBox;
     QLabel *countdownLabel;
+
+    // Optional lab camera panel
+    QGroupBox *cameraGroup = nullptr;
+    QLabel *cameraImage = nullptr;
+    QLabel *cameraStatus = nullptr;
+    QComboBox *cameraSchedule = nullptr;
+    QPushButton *cameraScheduleButton = nullptr;
+    QPushButton *cameraCaptureButton = nullptr;
+    QTimer *cameraRefreshTimer = nullptr;
+    QString cameraCaptureId;
 
     // Charts area
     QScrollArea *scrollArea = nullptr;   // used only when scrollable

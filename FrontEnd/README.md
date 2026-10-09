@@ -195,3 +195,6 @@ to re-enable — without charting it while it has no data.
 - **Fetch button** — pulls data for selected sensor and range
 - **Auto-refresh** — checkbox enables 60-second polling with countdown
 - **Status bar** — shows reading count and last update timestamp
+- **Lab camera panel** — latest B0647 image and timestamp, selectable automatic
+  capture interval, and an instant-capture button when the `camera` block is
+  enabled in `config.lab.json`

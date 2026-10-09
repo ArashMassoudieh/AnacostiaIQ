@@ -144,8 +144,10 @@ bool DashboardConfig::loadFromData(const QByteArray &bytes)
     QJsonObject root = doc.object();
 
     // ── Global settings ─────────────────────────────────────────
-    if (root.contains("api_url"))
+    if (root.contains("api_url")) {
         m_apiUrl = root.value("api_url").toString(m_apiUrl);
+    }
+    if (root.contains("project"))
         m_project = root.value("project").toString(m_project);
     if (root.contains("refresh_interval_sec"))
         m_refreshSec = root.value("refresh_interval_sec").toInt(m_refreshSec);
@@ -160,6 +162,15 @@ bool DashboardConfig::loadFromData(const QByteArray &bytes)
         QJsonObject r = root.value("default_range").toObject();
         m_rangeBack  = r.value("days_back").toInt(m_rangeBack);
         m_rangeAhead = r.value("days_ahead").toInt(m_rangeAhead);
+    }
+
+    if (root.contains("camera") && root.value("camera").isObject()) {
+        const QJsonObject camera = root.value("camera").toObject();
+        m_cameraEnabled = camera.value("enabled").toBool(false);
+        m_cameraStationId = camera.value("station_id").toString();
+        m_cameraTitle = camera.value("title").toString(m_cameraTitle);
+        if (m_cameraStationId.isEmpty())
+            m_cameraEnabled = false;
     }
 
     // ── Sensor list ─────────────────────────────────────────────

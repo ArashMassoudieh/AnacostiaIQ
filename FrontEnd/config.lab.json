@@ -5,6 +5,11 @@
   "project": "John-McCormack",
   "health_application_stale_seconds": 600,
   "window_title": "AnacostiaIQ — CUA Lab Dashboard",
+  "camera": {
+    "enabled": true,
+    "station_id": "lab_station_01",
+    "title": "CUA Lab Camera — Arducam B0647"
+  },
   "health_stations": [
     {
       "id": "lab_station_01",

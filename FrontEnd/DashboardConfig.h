@@ -65,6 +65,9 @@ public:
     bool    autoRefreshDefault() const{ return m_autoRefreshDefault; }
     bool    scrollableCharts() const  { return m_scrollable; }
     QString windowTitle() const       { return m_windowTitle; }
+    bool    cameraEnabled() const     { return m_cameraEnabled; }
+    QString cameraStationId() const   { return m_cameraStationId; }
+    QString cameraTitle() const       { return m_cameraTitle; }
 
     // ── Sensor selection ────────────────────────────────────────
     // The ordered list of sensor ids the dashboard should display.
@@ -99,6 +102,9 @@ private:
     bool    m_autoRefreshDefault = false;
     bool    m_scrollable   = false;
     QString m_windowTitle  = "Sensor Dashboard";
+    bool    m_cameraEnabled = false;
+    QString m_cameraStationId;
+    QString m_cameraTitle = "Lab Camera";
 
     // Sensor table, keyed by id, plus insertion order for display.
     QMap<QString, SensorDef> m_defs;

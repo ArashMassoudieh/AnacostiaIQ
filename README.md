@@ -307,6 +307,7 @@ is `chmod 600` and never committed.
 | `*.cpp` / `*.h` (root) | Shared sensor, config, cloud, health and GUI code |
 | `headless/` | `anacostiaiqd` daemon sources and project file |
 | `FrontEnd/` | Qt/WebAssembly web dashboard ([build guide](FrontEnd/README.md)) |
+| `server/` | Tracked Flask sensor and camera API deployed on EC2 |
 | `scripts/` | Startup installer, mode switcher, diagnostics, email monitor |
 | `deploy/` | systemd and autostart templates, [startup guide](deploy/README-startup.md) |
 | `docs/` | [System health telemetry reference](docs/system-health.md), [Raspberry Pi SSH access guide](docs/raspberry-pi-ssh-access.md) |
@@ -326,6 +327,7 @@ is `chmod 600` and never committed.
 | Second instance exits with code 2 | The other mode holds `~/.local/state/anacostiaiq/hardware.lock`. Use `scripts/anacostiaiq-mode`. |
 | No MaxBotix data or repeatable garbage bytes | Check the serial console and `/dev/ttyAMA0` vs `/dev/serial0` first. Then verify idle polarity and voltage: the lab MB7389 requires an active inverter with a 3.3-V-safe output. Confirm with `scripts/anacostiaiq-check` and the raw-UART procedure in §3.2. |
 | Readings stop reaching the dashboard | Check the queue: `wc -l ~/.local/state/anacostiaiq/upload-queue.jsonl`. A growing file means the API is unreachable; the backlog flushes automatically. |
+| Lab camera missing from dashboard | Check `rpicam-hello --list-cameras`, then `systemctl --user status anacostiaiq-camera.service`. See [Lab Arducam B0647 camera](docs/lab-camera.md). |
 
 ---
 

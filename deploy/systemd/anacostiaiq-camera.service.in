@@ -1,0 +1,13 @@
+[Unit]
+Description=AnacostiaIQ camera capture and upload agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@PYTHON@ @REPO@/scripts/camera_agent.py --config @CONFIG@
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
