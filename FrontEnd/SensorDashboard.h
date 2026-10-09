@@ -14,6 +14,8 @@
 #include <QStatusBar>
 #include <QGroupBox>
 #include <QScrollArea>
+#include <QSplitter>
+#include <QResizeEvent>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -72,6 +74,7 @@ private slots:
     void fetchCameraState();
     void requestCameraCapture();
     void saveCameraSchedule();
+    void fetchHealthState();
 
 private:
     void fetchConfig();
@@ -95,6 +98,8 @@ private:
     void setStatus(const QString &message);
     void updateCameraState(const QJsonObject &state);
     void fetchCameraImage(const QUrl &url);
+    void updateHealthSummary();
+    void resizeEvent(QResizeEvent *event) override;
 
     // Display helpers — now thin wrappers over DashboardConfig so the
     // chart-building code reads the same as before.
@@ -110,6 +115,9 @@ private:
     // UI
     QWidget *centralWidget;
     QVBoxLayout *mainLayout;
+    QSplitter *contentSplitter = nullptr;
+    QWidget *leftPane = nullptr;
+    QWidget *rightPane = nullptr;
 
     // Controls
     QGroupBox *controlGroup;
@@ -130,6 +138,17 @@ private:
     QPushButton *cameraCaptureButton = nullptr;
     QTimer *cameraRefreshTimer = nullptr;
     QString cameraCaptureId;
+
+    // Compact station health summary beside the camera.
+    QGroupBox *healthGroup = nullptr;
+    QLabel *healthOverall = nullptr;
+    QLabel *healthSensors = nullptr;
+    QLabel *healthApplication = nullptr;
+    QLabel *healthCloud = nullptr;
+    QLabel *healthQueue = nullptr;
+    QLabel *healthUpdated = nullptr;
+    QTimer *healthRefreshTimer = nullptr;
+    QMap<QString, int> healthStates;
 
     // Charts area
     QScrollArea *scrollArea = nullptr;   // used only when scrollable

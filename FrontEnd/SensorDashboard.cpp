@@ -4,6 +4,7 @@
 #include <QFont>
 #include <QPixmap>
 #include <QUrlQuery>
+#include <QJsonValue>
 #include <limits>
 
 SensorDashboard::SensorDashboard(const QString &configPath, QWidget *parent)
@@ -104,11 +105,22 @@ void SensorDashboard::finishInitialization()
                 this, &SensorDashboard::fetchCameraState);
     }
 
+    if (!config.healthStationId().isEmpty() && !config.healthComponents().isEmpty()) {
+        healthRefreshTimer = new QTimer(this);
+        healthRefreshTimer->setInterval(30000);
+        connect(healthRefreshTimer, &QTimer::timeout,
+                this, &SensorDashboard::fetchHealthState);
+    }
+
     setupUI();
 
     if (config.cameraEnabled()) {
         fetchCameraState();
         cameraRefreshTimer->start();
+    }
+    if (healthRefreshTimer) {
+        fetchHealthState();
+        healthRefreshTimer->start();
     }
 
     // Create chart widgets in configured order before asynchronous network
@@ -241,8 +253,9 @@ void SensorDashboard::setupUI()
 
     // === Control Panel ===
     controlGroup = new QGroupBox("Query Controls", this);
-    QHBoxLayout *controlRow = new QHBoxLayout(controlGroup);
-    controlRow->setSpacing(10);
+    QGridLayout *controlRow = new QGridLayout(controlGroup);
+    controlRow->setHorizontalSpacing(10);
+    controlRow->setVerticalSpacing(8);
 
     startLabel = new QLabel("From:", this);
     startDateTimeEdit = new QDateTimeEdit(this);
@@ -266,20 +279,21 @@ void SensorDashboard::setupUI()
     countdownLabel = new QLabel("", this);
     countdownLabel->setStyleSheet("color: #546e7a; font-style: italic;");
 
-    controlRow->addWidget(startLabel);
-    controlRow->addWidget(startDateTimeEdit);
-    controlRow->addWidget(endLabel);
-    controlRow->addWidget(endDateTimeEdit);
-    controlRow->addWidget(fetchButton);
-    controlRow->addSpacing(24);
-    controlRow->addWidget(autoRefreshCheckBox);
-    controlRow->addWidget(countdownLabel);
-    controlRow->addStretch();
+    controlRow->addWidget(startLabel, 0, 0);
+    controlRow->addWidget(startDateTimeEdit, 0, 1);
+    controlRow->addWidget(endLabel, 0, 2);
+    controlRow->addWidget(endDateTimeEdit, 0, 3);
+    controlRow->addWidget(fetchButton, 1, 0, 1, 2);
+    controlRow->addWidget(autoRefreshCheckBox, 1, 2);
+    controlRow->addWidget(countdownLabel, 1, 3);
+    controlRow->setColumnStretch(1, 1);
+    controlRow->setColumnStretch(3, 1);
 
     if (config.cameraEnabled()) {
         cameraGroup = new QGroupBox(config.cameraTitle(), this);
         QVBoxLayout *cameraLayout = new QVBoxLayout(cameraGroup);
-        QHBoxLayout *cameraControls = new QHBoxLayout();
+        QHBoxLayout *scheduleControls = new QHBoxLayout();
+        QHBoxLayout *cameraActions = new QHBoxLayout();
         cameraImage = new QLabel("Waiting for the first camera image…", this);
         cameraImage->setAlignment(Qt::AlignCenter);
         cameraImage->setMinimumHeight(260);
@@ -296,14 +310,13 @@ void SensorDashboard::setupUI()
         cameraSchedule->addItem("Every 24 hours", 24);
         cameraScheduleButton = new QPushButton("Save schedule", this);
         cameraCaptureButton = new QPushButton("Capture now", this);
-        cameraControls->addWidget(new QLabel("Automatic capture:", this));
-        cameraControls->addWidget(cameraSchedule);
-        cameraControls->addWidget(cameraScheduleButton);
-        cameraControls->addSpacing(16);
-        cameraControls->addWidget(cameraCaptureButton);
-        cameraControls->addStretch();
-        cameraControls->addWidget(cameraStatus);
-        cameraLayout->addLayout(cameraControls);
+        scheduleControls->addWidget(new QLabel("Automatic:", this));
+        scheduleControls->addWidget(cameraSchedule, 1);
+        scheduleControls->addWidget(cameraScheduleButton);
+        cameraActions->addWidget(cameraCaptureButton);
+        cameraActions->addWidget(cameraStatus, 1);
+        cameraLayout->addLayout(scheduleControls);
+        cameraLayout->addLayout(cameraActions);
         cameraLayout->addWidget(cameraImage, 1);
         connect(cameraCaptureButton, &QPushButton::clicked,
                 this, &SensorDashboard::requestCameraCapture);
@@ -319,6 +332,11 @@ void SensorDashboard::setupUI()
 
     // Layout mode is now a runtime config flag (scrollable_charts)
     // rather than a compile-time #ifdef.
+    QVBoxLayout *leftLayout = new QVBoxLayout();
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+    leftLayout->setSpacing(10);
+    leftLayout->addWidget(controlGroup);
+
     if (config.scrollableCharts()) {
         chartsLayout->setSpacing(10);
         scrollArea = new QScrollArea(this);
@@ -326,17 +344,56 @@ void SensorDashboard::setupUI()
         scrollArea->setFrameShape(QFrame::NoFrame);
         scrollArea->setWidget(chartsContainer);
 
-        mainLayout->addWidget(controlGroup);
-        if (cameraGroup)
-            mainLayout->addWidget(cameraGroup);
-        mainLayout->addWidget(scrollArea, 1);
+        leftLayout->addWidget(scrollArea, 1);
     } else {
         chartsLayout->setSpacing(4);
-        mainLayout->addWidget(controlGroup);
-        if (cameraGroup)
-            mainLayout->addWidget(cameraGroup);
-        mainLayout->addWidget(chartsContainer, 1);
+        leftLayout->addWidget(chartsContainer, 1);
     }
+
+    leftPane = new QWidget(this);
+    leftPane->setLayout(leftLayout);
+
+    QVBoxLayout *rightLayout = new QVBoxLayout();
+    rightLayout->setContentsMargins(0, 0, 0, 0);
+    rightLayout->setSpacing(10);
+    if (cameraGroup)
+        rightLayout->addWidget(cameraGroup, 3);
+
+    if (!config.healthStationId().isEmpty() && !config.healthComponents().isEmpty()) {
+        healthGroup = new QGroupBox(config.healthStationName() + " Health", this);
+        QVBoxLayout *healthLayout = new QVBoxLayout(healthGroup);
+        const auto makeHealthRow = [this, healthLayout](const QString &name) {
+            QLabel *label = new QLabel(name + ":  Checking…", this);
+            label->setStyleSheet(
+                "background:#191d22; border:1px solid #303640; border-radius:6px;"
+                "padding:8px 10px; color:#b0bec5; font-weight:600;");
+            healthLayout->addWidget(label);
+            return label;
+        };
+        healthOverall = makeHealthRow("Overall");
+        healthSensors = makeHealthRow("Sensors");
+        healthApplication = makeHealthRow("Application");
+        healthCloud = makeHealthRow("Cloud / API");
+        healthQueue = makeHealthRow("Upload queue");
+        healthUpdated = new QLabel("Loading current station health…", this);
+        healthUpdated->setStyleSheet("color:#607d8b; font-size:11px;");
+        healthLayout->addWidget(healthUpdated);
+        rightLayout->addWidget(healthGroup, 2);
+    }
+    rightLayout->addStretch();
+    rightPane = new QWidget(this);
+    rightPane->setLayout(rightLayout);
+    rightPane->setMinimumWidth(360);
+
+    contentSplitter = new QSplitter(Qt::Horizontal, this);
+    contentSplitter->setChildrenCollapsible(false);
+    contentSplitter->setHandleWidth(8);
+    contentSplitter->addWidget(leftPane);
+    contentSplitter->addWidget(rightPane);
+    contentSplitter->setStretchFactor(0, 7);
+    contentSplitter->setStretchFactor(1, 4);
+    contentSplitter->setSizes({760, 440});
+    mainLayout->addWidget(contentSplitter, 1);
 
     setCentralWidget(centralWidget);
     statusBar()->showMessage(
@@ -349,6 +406,14 @@ void SensorDashboard::setupUI()
             this, &SensorDashboard::onFetchClicked);
     connect(autoRefreshCheckBox, &QCheckBox::toggled,
             this, &SensorDashboard::onAutoRefreshToggled);
+}
+
+void SensorDashboard::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    if (contentSplitter)
+        contentSplitter->setOrientation(event->size().width() < 900
+                                        ? Qt::Vertical : Qt::Horizontal);
 }
 
 // ================================================================
@@ -516,6 +581,135 @@ void SensorDashboard::fetchCameraImage(const QUrl &url)
         }
         reply->deleteLater();
     });
+}
+
+// ================================================================
+//  Network — compact station health summary
+// ================================================================
+
+void SensorDashboard::fetchHealthState()
+{
+    const QString stationId = config.healthStationId();
+    const QVector<HealthComponentDef> components = config.healthComponents();
+    if (stationId.isEmpty() || components.isEmpty())
+        return;
+
+    healthStates.clear();
+    updateHealthSummary();
+
+    const QDateTime end = QDateTime::currentDateTime();
+    const QDateTime start = end.addDays(-1);
+    const QString timestampFormat = "yyyy-MM-dd'T'HH:mm:ss";
+
+    for (const HealthComponentDef &component : components) {
+        QUrl url(apiUrl + "/sensor/health_" + stationId + "_" + component.id);
+        QUrlQuery query;
+        query.addQueryItem("start", start.toString(timestampFormat));
+        query.addQueryItem("end", end.toString(timestampFormat));
+        if (!project.isEmpty())
+            query.addQueryItem("project", project);
+        url.setQuery(query);
+
+        QNetworkReply *reply = networkManager->get(QNetworkRequest(url));
+        connect(reply, &QNetworkReply::finished, this,
+                [this, reply, component]() {
+            int state = -1;
+            if (reply->error() == QNetworkReply::NoError) {
+                const QJsonDocument document = QJsonDocument::fromJson(reply->readAll());
+                QJsonArray readings;
+                if (document.isArray())
+                    readings = document.array();
+                else if (document.isObject())
+                    readings = document.object().value("readings").toArray();
+
+                QDateTime newestTime;
+                for (const QJsonValue &value : readings) {
+                    const QJsonObject reading = value.toObject();
+                    const QDateTime timestamp = QDateTime::fromString(
+                        reading.value("timestamp").toString(), Qt::ISODate);
+                    if (!timestamp.isValid() ||
+                        (newestTime.isValid() && timestamp <= newestTime))
+                        continue;
+                    newestTime = timestamp;
+                    const QJsonValue stateValue = reading.value("value");
+                    state = stateValue.isString()
+                        ? stateValue.toString().toInt()
+                        : stateValue.toInt(-1);
+                }
+            }
+            healthStates.insert(component.id, state);
+            updateHealthSummary();
+            reply->deleteLater();
+        });
+    }
+}
+
+void SensorDashboard::updateHealthSummary()
+{
+    if (!healthGroup)
+        return;
+
+    const auto stateName = [](int state) {
+        switch (state) {
+        case 0: return QString("Healthy");
+        case 1: return QString("Degraded");
+        case 2: return QString("Offline");
+        case 3: return QString("Critical");
+        default: return QString("Checking…");
+        }
+    };
+    const auto stateColor = [](int state) {
+        switch (state) {
+        case 0: return QString("#6ee7a2");
+        case 1: return QString("#ffc766");
+        case 2: return QString("#ff8f8f");
+        case 3: return QString("#ff7a97");
+        default: return QString("#a9bac7");
+        }
+    };
+    const auto setRow = [&stateName, &stateColor](QLabel *label,
+                                                   const QString &name,
+                                                   int state,
+                                                   const QString &detail = QString()) {
+        if (!label)
+            return;
+        const QString value = detail.isEmpty() ? stateName(state) : detail;
+        label->setText(name + ":  " + value);
+        label->setStyleSheet(QString(
+            "background:#191d22; border:1px solid #303640; border-radius:6px;"
+            "padding:8px 10px; color:%1; font-weight:700;").arg(stateColor(state)));
+    };
+
+    setRow(healthOverall, "Overall", healthStates.value("overall", -1));
+    setRow(healthApplication, "Application", healthStates.value("application", -1));
+    setRow(healthCloud, "Cloud / API", healthStates.value("cloud", -1));
+    setRow(healthQueue, "Upload queue", healthStates.value("upload_queue", -1));
+
+    int sensorCount = 0;
+    int healthyCount = 0;
+    int sensorWorst = -1;
+    for (auto it = healthStates.cbegin(); it != healthStates.cend(); ++it) {
+        if (!it.key().startsWith("sensor_"))
+            continue;
+        sensorCount++;
+        if (it.value() == 0)
+            healthyCount++;
+        if (it.value() > sensorWorst)
+            sensorWorst = it.value();
+    }
+    const QString sensorDetail = sensorCount == 0
+        ? QString("Checking…")
+        : QString("%1 of %2 healthy").arg(healthyCount).arg(sensorCount);
+    setRow(healthSensors, "Sensors", sensorWorst, sensorDetail);
+
+    if (healthUpdated) {
+        const int received = healthStates.size();
+        const int expected = config.healthComponents().size();
+        healthUpdated->setText(received < expected
+            ? QString("Refreshing health… %1/%2").arg(received).arg(expected)
+            : QString("Updated %1 · full details on Health page")
+                  .arg(QDateTime::currentDateTime().toString("h:mm:ss AP")));
+    }
 }
 
 // ================================================================

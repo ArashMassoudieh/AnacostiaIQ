@@ -173,6 +173,30 @@ bool DashboardConfig::loadFromData(const QByteArray &bytes)
             m_cameraEnabled = false;
     }
 
+    m_healthStationId.clear();
+    m_healthStationName = "Station";
+    const QJsonArray healthStations = root.value("health_stations").toArray();
+    for (const QJsonValue &value : healthStations) {
+        const QJsonObject station = value.toObject();
+        if (station.value("visible").toBool(true) &&
+            !station.value("id").toString().isEmpty()) {
+            m_healthStationId = station.value("id").toString();
+            m_healthStationName = station.value("name").toString(m_healthStationId);
+            break;
+        }
+    }
+    if (m_healthStationId.isEmpty())
+        m_healthStationId = m_cameraStationId;
+
+    m_healthComponents.clear();
+    const QJsonArray healthComponents = root.value("health_components").toArray();
+    for (const QJsonValue &value : healthComponents) {
+        const QJsonObject component = value.toObject();
+        const QString id = component.value("id").toString();
+        if (!id.isEmpty())
+            m_healthComponents.append({id, component.value("name").toString(id)});
+    }
+
     // ── Sensor list ─────────────────────────────────────────────
     // Two accepted shapes:
     //   "sensors": ["temperature", "moisture_sensor"]          (ids only)
