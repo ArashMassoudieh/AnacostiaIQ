@@ -6,6 +6,7 @@
 #include "DistanceSensor.h"
 #include "MoistureSensor.h"
 #include "MoistureSensorI2C.h"
+#include "CurrentLoopSensorI2C.h"
 #include "MaxbotixSensor.h"
 #include "AdcBus.h"
 #include "Ads1115Bus.h"
@@ -142,11 +143,12 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
     // Unlike AdcBus, channels don't need to be registered up front —
     // each ADS1115 read is its own independent single-shot conversion,
     // so the bus only needs to know it should exist at all. Skipped
-    // entirely when no "moisture_ads1115" sensor is configured.
+    // entirely when no ADS1115-backed sensor is configured.
     std::shared_ptr<Ads1115Bus> ads1115Bus;
     bool haveAds1115Sensor = false;
     for (const QJsonValue &v : arr) {
-        if (v.toObject().value("type").toString() == "moisture_ads1115") {
+        const QString type = v.toObject().value("type").toString();
+        if (type == "moisture_ads1115" || type == "current_loop_ads1115") {
             haveAds1115Sensor = true;
             break;
         }
@@ -223,6 +225,23 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
 
             sensor = new MoistureSensorI2C(id, unit, name, ads1115Bus,
                                            channel, adcDry, adcWet);
+        }
+        else if (type == "current_loop_ads1115") {
+            const int channel = params.value("channel").toInt(-1);
+            const double shuntOhms = params.value("shuntOhms").toDouble(120.0);
+            const double validMinMa = params.value("validMinMa").toDouble(3.5);
+            const double validMaxMa = params.value("validMaxMa").toDouble(21.5);
+            const bool scaleOutput = params.contains("outputMin") &&
+                                     params.contains("outputMax");
+            const double currentMinMa = params.value("currentMinMa").toDouble(4.0);
+            const double currentMaxMa = params.value("currentMaxMa").toDouble(20.0);
+            const double outputMin = params.value("outputMin").toDouble(0.0);
+            const double outputMax = params.value("outputMax").toDouble(0.0);
+
+            sensor = new CurrentLoopSensorI2C(
+                id, unit, name, ads1115Bus, channel, shuntOhms,
+                validMinMa, validMaxMa, scaleOutput, currentMinMa,
+                currentMaxMa, outputMin, outputMax);
         }
         else if (type == "maxbotix") {
             QString device     = params.value("device").toString("/dev/serial0");

@@ -115,6 +115,23 @@
       }
     },
     {
+      "_comment": "LAB PI ONLY: two-wire 4-20 mA water-level/pressure transmitter on ADS1115 A3. A 120-ohm shunt converts the loop to 0.48-2.40 V; a 1-kohm series resistor protects A3. Bench verification on 2026-10-09 measured 0.468 V / 3.90 mA at zero applied pressure. The probe's full-scale range is not yet identified, so publish loop current directly; once confirmed, add outputMin/outputMax and the matching engineering unit to enable config-only scaling.",
+      "id": "lab_pressure_loop_current",
+      "type": "current_loop_ads1115",
+      "unit": "mA",
+      "name": "Water-Level Transmitter Loop Current",
+      "intervalSeconds": 10,
+      "samplesPerReading": 3,
+      "params": {
+        "channel": 3,
+        "shuntOhms": 120.0,
+        "validMinMa": 3.5,
+        "validMaxMa": 21.5,
+        "currentMinMa": 4.0,
+        "currentMaxMa": 20.0
+      }
+    },
+    {
       "_comment": "ENABLED — the original CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This original lab unit free-runs, so do not add triggerPin to this entry. The new MB7389-100 is a separate sensor on UART2 in the following entry. Published with lab-specific ID lab_maxbotix_depth_1 so cloud data cannot mix with the field station.",
       "type": "maxbotix",
       "id": "lab_maxbotix_depth_1",

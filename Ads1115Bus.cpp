@@ -172,3 +172,7 @@ int Ads1115Bus::read(int channel) {
     cached.age.start();
     return raw;
 }
+
+double Ads1115Bus::rawToVoltage(int raw) const {
+    return static_cast<double>(raw) * m_fsVoltage / 32768.0;
+}

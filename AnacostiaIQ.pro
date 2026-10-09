@@ -32,6 +32,7 @@ SOURCES += \
     DistanceSensor.cpp \
     MoistureSensor.cpp \
     MoistureSensorI2C.cpp \
+    CurrentLoopSensorI2C.cpp \
     MaxbotixSensor.cpp \
     chartcontainer.cpp \
     main.cpp \
@@ -50,6 +51,7 @@ HEADERS += \
     DistanceSensor.h \
     MoistureSensor.h \
     MoistureSensorI2C.h \
+    CurrentLoopSensorI2C.h \
     MaxbotixSensor.h \
     chartcontainer.h \
     WeatherFetcher.h \

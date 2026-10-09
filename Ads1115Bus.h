@@ -50,6 +50,11 @@ public:
     // channel is still within the cache window.
     int read(int channel);
 
+    // Convert a raw ADS1115 count using the PGA range configured for this
+    // shared bus. Keeping this here ensures every sensor uses the same scale
+    // that convertChannel() programmed into the hardware.
+    double rawToVoltage(int raw) const;
+
 private:
     bool convertChannel(int channel, int &raw);
 

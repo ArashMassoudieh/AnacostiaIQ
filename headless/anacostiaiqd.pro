@@ -39,6 +39,7 @@ SOURCES += \
     $$PWD/../DistanceSensor.cpp \
     $$PWD/../MoistureSensor.cpp \
     $$PWD/../MoistureSensorI2C.cpp \
+    $$PWD/../CurrentLoopSensorI2C.cpp \
     $$PWD/../MaxbotixSensor.cpp \
     $$PWD/../WeatherFetcher.cpp \
     HeadlessMonitor.cpp \
@@ -56,6 +57,7 @@ HEADERS += \
     $$PWD/../DistanceSensor.h \
     $$PWD/../MoistureSensor.h \
     $$PWD/../MoistureSensorI2C.h \
+    $$PWD/../CurrentLoopSensorI2C.h \
     $$PWD/../MaxbotixSensor.h \
     $$PWD/../WeatherFetcher.h \
     HeadlessMonitor.h

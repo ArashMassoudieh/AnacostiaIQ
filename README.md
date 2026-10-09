@@ -11,7 +11,7 @@ classes, `config.json`, cloud writer, upload queue and health monitor:
 | `anacostiaiqd` | `headless/anacostiaiqd.pro` | Console daemon for a Raspberry Pi with no display, run under systemd |
 
 Readings from the configured sensors (HC-SR04 ultrasonic, MaxBotix MB7389-100
-over UART, soil moisture via an ADS1115 I²C ADC) and a weather forecast
+over UART, soil moisture and 4-20 mA transmitters via an ADS1115 I²C ADC) and a weather forecast
 (Open-Meteo or NOAA) are pushed to the cloud API declared in `config.json`.
 Every record is queued on disk first, so an Internet outage delays delivery
 instead of losing measurements.

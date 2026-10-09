@@ -1,6 +1,8 @@
 {
   "_comment": "Separate dashboard configuration for the CUA lab station. Lab measurement IDs are intentionally namespaced so DynamoDB does not mix them with field-station series.",
   "api_url": "http://54.213.147.59:5000",
+  "_projectComment": "Must match the project in the lab Pi config.json so API queries use the same data namespace.",
+  "project": "John-McCormack",
   "health_application_stale_seconds": 600,
   "window_title": "AnacostiaIQ — CUA Lab Dashboard",
   "health_stations": [
@@ -18,6 +20,7 @@
     {"id": "sensor_lab_moisture_a0", "name": "Soil Moisture A0"},
     {"id": "sensor_lab_moisture_a1", "name": "Soil Moisture A1"},
     {"id": "sensor_lab_moisture_a2", "name": "Soil Moisture A2"},
+    {"id": "sensor_lab_pressure_loop_current", "name": "Water-Level Transmitter Loop"},
     {"id": "application", "name": "Application"},
     {"id": "cloud", "name": "Cloud / API"},
     {"id": "upload_queue", "name": "Upload Queue"},
@@ -82,6 +85,16 @@
       "unit": "%",
       "color": "#ffa726",
       "area_color": "#28ffa726",
+      "floor_at_zero": true,
+      "visible": true
+    },
+    {
+      "_comment": "Diagnostic 4-20 mA loop value. Convert to pressure/depth only after confirming the transmitter's full-scale range.",
+      "id": "lab_pressure_loop_current",
+      "name": "Water-Level Transmitter Current",
+      "unit": "mA",
+      "color": "#ec407a",
+      "area_color": "#28ec407a",
       "floor_at_zero": true,
       "visible": true
     }
