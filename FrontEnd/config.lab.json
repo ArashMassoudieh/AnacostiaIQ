@@ -25,7 +25,7 @@
     {"id": "sensor_lab_moisture_a0", "name": "Soil Moisture A0"},
     {"id": "sensor_lab_moisture_a1", "name": "Soil Moisture A1"},
     {"id": "sensor_lab_moisture_a2", "name": "Soil Moisture A2"},
-    {"id": "sensor_lab_pressure_loop_current", "name": "Water-Level Transmitter Loop"},
+    {"id": "sensor_lab_pressure_loop_current", "name": "Water-Level Transmitter Depth"},
     {"id": "application", "name": "Application"},
     {"id": "cloud", "name": "Cloud / API"},
     {"id": "upload_queue", "name": "Upload Queue"},
@@ -94,10 +94,10 @@
       "visible": true
     },
     {
-      "_comment": "Diagnostic 4-20 mA loop value. Convert to pressure/depth only after confirming the transmitter's full-scale range.",
+      "_comment": "Provisional 2-point calibration (0 in / 3.90 mA bench zero, 2.7 in / 4.852 mA bench glass) -- see config.json for details. Needs a deeper second calibration point before trusting readings beyond 2.7 in.",
       "id": "lab_pressure_loop_current",
-      "name": "Water-Level Transmitter Current",
-      "unit": "mA",
+      "name": "Water-Level Transmitter Depth",
+      "unit": "in",
       "color": "#ec407a",
       "area_color": "#28ec407a",
       "floor_at_zero": true,
