@@ -115,7 +115,7 @@
       }
     },
     {
-      "_comment": "LAB PI ONLY: two-wire 4-20 mA water-level/pressure transmitter on ADS1115 A3. A 120-ohm shunt converts the loop to 0.48-2.40 V; a 1-kohm series resistor protects A3. PROVISIONAL two-point calibration, both points near the bottom of the sensor's range: 3.90 mA / 0.468 V measured 2026-10-09 at zero applied pressure (0.0 in), and 4.852 mA measured 2026-10-15 at 2.7 in of water in a bench glass (depth read by eye, not precision-measured). This is a short extrapolation base for a transmitter whose other stations run 48-75 in standpipes -- add a second, deeper calibration point before trusting readings outside the 0-2.7 in range this was actually verified against.",
+      "_comment": "LAB PI ONLY: two-wire 4-20 mA water-level/pressure transmitter on ADS1115 A3. 'circuit' is the fixed measurement hardware (120-ohm shunt, 1-kohm series resistor protecting A3, NAMUR-style validMinMa/validMaxMa for open-loop/failure detection) -- shared by any probe wired here. 'calibration' is THIS probe's current-to-depth mapping and is expected to be replaced independently if the probe is swapped or recalibrated; calibration.points is the raw data behind the fitted currentMinMa/currentMaxMa/outputMin/outputMax. PROVISIONAL: only 2 points exist, both near the bottom of the sensor's range (0-2.7 in), for a transmitter whose other stations run 48-75 in standpipes. Treat as a working calibration for lab bring-up, not research-quality data -- collect >=5 points spanning 0 to the intended max depth and confirm linearity (residuals/R-squared) rather than assuming it, before this feeds anything like OpenHydroTwin data assimilation. CurrentLoopSensorI2C does not clamp to the calibrated span: an out-of-span reading is reported as an honest extrapolation with a warning logged, not silently pinned to the nearest endpoint. Raw loop current remains separately available as lab_pressure_loop_current_raw for diagnosing drift independent of this calibration.",
       "id": "lab_pressure_loop_current",
       "type": "current_loop_ads1115",
       "unit": "in",
@@ -123,14 +123,51 @@
       "intervalSeconds": 10,
       "samplesPerReading": 3,
       "params": {
-        "channel": 3,
-        "shuntOhms": 120.0,
-        "validMinMa": 3.5,
-        "validMaxMa": 21.5,
-        "currentMinMa": 3.90,
-        "currentMaxMa": 4.852,
-        "outputMin": 0.0,
-        "outputMax": 2.7
+        "circuit": {
+          "channel": 3,
+          "shuntOhms": 120.0,
+          "validMinMa": 3.5,
+          "validMaxMa": 21.5
+        },
+        "calibration": {
+          "currentMinMa": 3.9,
+          "currentMaxMa": 4.852,
+          "outputMin": 0.0,
+          "outputMax": 2.7,
+          "points": [
+            {
+              "date": "2026-10-09",
+              "reference_depth_in": 0.0,
+              "current_ma": 3.9,
+              "voltage_v": 0.468,
+              "notes": "Zero applied pressure, bench verification."
+            },
+            {
+              "date": "2026-10-15",
+              "reference_depth_in": 2.7,
+              "current_ma": 4.852,
+              "voltage_v": 0.582125,
+              "notes": "Submerged in a bench glass; depth read by eye against the glass, not precision-measured."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "_comment": "Diagnostic twin of lab_pressure_loop_current on the same ADS1115 A3 channel, publishing raw loop current with no scaling applied (no 'calibration' block). Lets drift, a bad calibration, or an out-of-span reading be checked directly in mA without reconstructing it from the depth value. Hidden from the default lab dashboard chart (see FrontEnd/config.lab.json) but always queryable from the API.",
+      "id": "lab_pressure_loop_current_raw",
+      "type": "current_loop_ads1115",
+      "unit": "mA",
+      "name": "Water-Level Transmitter Loop Current (raw)",
+      "intervalSeconds": 10,
+      "samplesPerReading": 3,
+      "params": {
+        "circuit": {
+          "channel": 3,
+          "shuntOhms": 120.0,
+          "validMinMa": 3.5,
+          "validMaxMa": 21.5
+        }
       }
     },
     {

@@ -81,10 +81,26 @@ double CurrentLoopSensorI2C::measure() {
         return currentMa;
     }
 
-    const double boundedMa = qBound(m_currentMinMa, currentMa, m_currentMaxMa);
-    const double fraction = (boundedMa - m_currentMinMa) /
+    // Deliberately NOT clamped to [currentMinMa, currentMaxMa] before this
+    // division: for an empirically calibrated probe (as opposed to a
+    // nominal 4-20 mA spec), silently pinning an out-of-span reading to the
+    // calibration endpoint would hide a real over/under-range condition.
+    // The formula is linearly extrapolated instead, and a warning is logged
+    // so an extrapolated value is diagnosable rather than indistinguishable
+    // from an interpolated one. validMinMa/validMaxMa above remain a hard
+    // reject -- that's open-loop/failed-transmitter detection on the
+    // circuit itself, a different concept from the calibration span.
+    const double fraction = (currentMa - m_currentMinMa) /
                             (m_currentMaxMa - m_currentMinMa);
     const double output = m_outputMin + fraction * (m_outputMax - m_outputMin);
+
+    if (fraction < 0.0 || fraction > 1.0) {
+        qWarning() << "CurrentLoopSensorI2C" << id()
+                   << ": reading extrapolates beyond the calibrated span ("
+                   << currentMa << "mA vs calibrated" << m_currentMinMa << "-"
+                   << m_currentMaxMa << "mA) -- output" << output << unit()
+                   << "is extrapolated, not interpolated";
+    }
 
     qDebug() << "CurrentLoopSensorI2C" << id() << ": raw =" << raw
              << "voltage =" << volts << "V current =" << currentMa

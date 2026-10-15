@@ -102,6 +102,16 @@
       "area_color": "#28ec407a",
       "floor_at_zero": true,
       "visible": true
+    },
+    {
+      "_comment": "Raw loop current, unscaled -- diagnostic twin of lab_pressure_loop_current. Hidden from the default chart view; set visible:true to inspect mA directly (e.g. while checking for drift or an out-of-calibration reading).",
+      "id": "lab_pressure_loop_current_raw",
+      "name": "Water-Level Transmitter Loop Current (raw)",
+      "unit": "mA",
+      "color": "#bdbdbd",
+      "area_color": "#28bdbdbd",
+      "floor_at_zero": false,
+      "visible": false
     }
   ]
 }

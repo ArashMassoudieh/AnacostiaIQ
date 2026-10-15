@@ -227,16 +227,29 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
                                            channel, adcDry, adcWet);
         }
         else if (type == "current_loop_ads1115") {
-            const int channel = params.value("channel").toInt(-1);
-            const double shuntOhms = params.value("shuntOhms").toDouble(120.0);
-            const double validMinMa = params.value("validMinMa").toDouble(3.5);
-            const double validMaxMa = params.value("validMaxMa").toDouble(21.5);
-            const bool scaleOutput = params.contains("outputMin") &&
-                                     params.contains("outputMax");
-            const double currentMinMa = params.value("currentMinMa").toDouble(4.0);
-            const double currentMaxMa = params.value("currentMaxMa").toDouble(20.0);
-            const double outputMin = params.value("outputMin").toDouble(0.0);
-            const double outputMax = params.value("outputMax").toDouble(0.0);
+            // "circuit" is the fixed measurement hardware (shunt, channel,
+            // NAMUR-style open-loop/failure bounds) -- the same for any
+            // probe wired to this circuit. "calibration" is this specific
+            // probe's current-to-engineering-unit mapping, expected to be
+            // replaced independently as the probe is recalibrated or swapped.
+            // Falls back to flat params (pre-calibration-split config) so an
+            // older entry without the nested objects still loads.
+            const QJsonObject circuit = params.contains("circuit")
+                ? params.value("circuit").toObject() : params;
+            const QJsonObject calibration = params.contains("calibration")
+                ? params.value("calibration").toObject() : params;
+
+            const int channel = circuit.value("channel").toInt(-1);
+            const double shuntOhms = circuit.value("shuntOhms").toDouble(120.0);
+            const double validMinMa = circuit.value("validMinMa").toDouble(3.5);
+            const double validMaxMa = circuit.value("validMaxMa").toDouble(21.5);
+
+            const bool scaleOutput = calibration.contains("outputMin") &&
+                                     calibration.contains("outputMax");
+            const double currentMinMa = calibration.value("currentMinMa").toDouble(4.0);
+            const double currentMaxMa = calibration.value("currentMaxMa").toDouble(20.0);
+            const double outputMin = calibration.value("outputMin").toDouble(0.0);
+            const double outputMax = calibration.value("outputMax").toDouble(0.0);
 
             sensor = new CurrentLoopSensorI2C(
                 id, unit, name, ads1115Bus, channel, shuntOhms,
