@@ -115,11 +115,11 @@
       }
     },
     {
-      "_comment": "LAB PI ONLY: two-wire 4-20 mA water-level/pressure transmitter on ADS1115 A3. A 120-ohm shunt converts the loop to 0.48-2.40 V; a 1-kohm series resistor protects A3. Bench verification on 2026-10-09 measured 0.468 V / 3.90 mA at zero applied pressure. The probe's full-scale range is not yet identified, so publish loop current directly; once confirmed, add outputMin/outputMax and the matching engineering unit to enable config-only scaling.",
+      "_comment": "LAB PI ONLY: two-wire 4-20 mA water-level/pressure transmitter on ADS1115 A3. A 120-ohm shunt converts the loop to 0.48-2.40 V; a 1-kohm series resistor protects A3. PROVISIONAL two-point calibration, both points near the bottom of the sensor's range: 3.90 mA / 0.468 V measured 2026-10-09 at zero applied pressure (0.0 in), and 4.852 mA measured 2026-10-15 at 2.7 in of water in a bench glass (depth read by eye, not precision-measured). This is a short extrapolation base for a transmitter whose other stations run 48-75 in standpipes -- add a second, deeper calibration point before trusting readings outside the 0-2.7 in range this was actually verified against.",
       "id": "lab_pressure_loop_current",
       "type": "current_loop_ads1115",
-      "unit": "mA",
-      "name": "Water-Level Transmitter Loop Current",
+      "unit": "in",
+      "name": "Water-Level Transmitter Depth",
       "intervalSeconds": 10,
       "samplesPerReading": 3,
       "params": {
@@ -127,8 +127,10 @@
         "shuntOhms": 120.0,
         "validMinMa": 3.5,
         "validMaxMa": 21.5,
-        "currentMinMa": 4.0,
-        "currentMaxMa": 20.0
+        "currentMinMa": 3.90,
+        "currentMaxMa": 4.852,
+        "outputMin": 0.0,
+        "outputMax": 2.7
       }
     },
     {
