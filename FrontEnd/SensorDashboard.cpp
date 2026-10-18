@@ -103,7 +103,7 @@ void SensorDashboard::finishInitialization()
     });
     countdownSeconds = refreshIntervalSec;
 
-    if (config.cameraEnabled()) {
+    if (config.cameraEnabled() && config.cameraStaticImageUrl().isEmpty()) {
         cameraRefreshTimer = new QTimer(this);
         cameraRefreshTimer->setInterval(30000);
         connect(cameraRefreshTimer, &QTimer::timeout,
@@ -120,8 +120,13 @@ void SensorDashboard::finishInitialization()
     setupUI();
 
     if (config.cameraEnabled()) {
-        fetchCameraState();
-        cameraRefreshTimer->start();
+        if (config.cameraStaticImageUrl().isEmpty()) {
+            fetchCameraState();
+            cameraRefreshTimer->start();
+        } else {
+            cameraStatus->setText(config.cameraCaption());
+            fetchCameraImage(QUrl(config.cameraStaticImageUrl()));
+        }
     }
     if (healthRefreshTimer) {
         fetchHealthState();
@@ -315,7 +320,8 @@ void SensorDashboard::setupUI()
         cameraSchedule->addItem("Every 24 hours", 24);
         cameraScheduleButton = new QPushButton("Save schedule", this);
         cameraCaptureButton = new QPushButton("Capture now", this);
-        scheduleControls->addWidget(new QLabel("Automatic:", this));
+        QLabel *automaticLabel = new QLabel("Automatic:", this);
+        scheduleControls->addWidget(automaticLabel);
         scheduleControls->addWidget(cameraSchedule, 1);
         scheduleControls->addWidget(cameraScheduleButton);
         cameraActions->addWidget(cameraCaptureButton);
@@ -323,6 +329,14 @@ void SensorDashboard::setupUI()
         cameraLayout->addLayout(scheduleControls);
         cameraLayout->addLayout(cameraActions);
         cameraLayout->addWidget(cameraImage, 1);
+        if (!config.cameraStaticImageUrl().isEmpty()) {
+            automaticLabel->hide();
+            cameraSchedule->hide();
+            cameraScheduleButton->hide();
+            cameraCaptureButton->hide();
+            cameraStatus->setAlignment(Qt::AlignCenter);
+            cameraImage->setMaximumHeight(QWIDGETSIZE_MAX);
+        }
         connect(cameraCaptureButton, &QPushButton::clicked,
                 this, &SensorDashboard::requestCameraCapture);
         connect(cameraScheduleButton, &QPushButton::clicked,

@@ -64,6 +64,7 @@ OPTIONAL_FILES=(
 # copy. Shipping the tracked file makes it the single source of truth.
 SITE_FILES=(
     "web/index.html"
+    "web/field-site-overview.jpg"
     "config.json"
 )
 

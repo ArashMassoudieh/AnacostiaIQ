@@ -5,6 +5,12 @@
   "project": "John-McCormack",
   "health_application_stale_seconds": 600,
   "window_title": "AnacostiaIQ — Sensor Dashboard",
+  "camera": {
+    "enabled": true,
+    "static_image": "field-site-overview.jpg",
+    "title": "Field Site View",
+    "caption": "John McCormack bioretention monitoring site"
+  },
   "health_stations": [
     {
       "id": "field_station_01",

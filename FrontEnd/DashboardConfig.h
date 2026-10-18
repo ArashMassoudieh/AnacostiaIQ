@@ -74,6 +74,8 @@ public:
     bool    cameraEnabled() const     { return m_cameraEnabled; }
     QString cameraStationId() const   { return m_cameraStationId; }
     QString cameraTitle() const       { return m_cameraTitle; }
+    QString cameraStaticImageUrl() const { return m_cameraStaticImageUrl; }
+    QString cameraCaption() const     { return m_cameraCaption; }
     QString healthStationId() const   { return m_healthStationId; }
     QString healthStationName() const { return m_healthStationName; }
     QVector<HealthComponentDef> healthComponents() const {
@@ -117,6 +119,8 @@ private:
     bool    m_cameraEnabled = false;
     QString m_cameraStationId;
     QString m_cameraTitle = "Lab Camera";
+    QString m_cameraStaticImageUrl;
+    QString m_cameraCaption;
     QString m_healthStationId;
     QString m_healthStationName = "Station";
     QVector<HealthComponentDef> m_healthComponents;

@@ -171,7 +171,9 @@ bool DashboardConfig::loadFromData(const QByteArray &bytes)
         m_cameraEnabled = camera.value("enabled").toBool(false);
         m_cameraStationId = camera.value("station_id").toString();
         m_cameraTitle = camera.value("title").toString(m_cameraTitle);
-        if (m_cameraStationId.isEmpty())
+        m_cameraStaticImageUrl = camera.value("static_image").toString();
+        m_cameraCaption = camera.value("caption").toString();
+        if (m_cameraStationId.isEmpty() && m_cameraStaticImageUrl.isEmpty())
             m_cameraEnabled = false;
     }
 
