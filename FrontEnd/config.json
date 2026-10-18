@@ -22,6 +22,8 @@
   "refresh_interval_sec": 60,
   "auto_refresh": false,
   "scrollable_charts": true,
+  "demo_fallback": true,
+  "_demoFallbackComment": "Meeting/demo safety net: when a configured series has no API readings in the selected range, render clearly labelled simulated data in the browser. Synthetic values are never uploaded or stored. Set false after field telemetry returns.",
   "default_range": {
     "days_back": 7,
     "days_ahead": 7

@@ -185,12 +185,13 @@ ssh "${SSH_OPTS[@]}" "$TARGET" "mkdir -p '$STAGING'"
 # actually visible removes that. Patched here rather than in the build tree
 # because Qt regenerates this file on every rebuild.
 PATCHED_HTML=""
+PATCHED_JS=""
 patch_loader() {
     local src="$1"
     PATCHED_HTML="$(mktemp -t sensordashboard-XXXXXX.html)"
-    python3 - "$src" "$PATCHED_HTML" <<'PYEOF'
+    python3 - "$src" "$PATCHED_HTML" "$STAMP" <<'PYEOF'
 import sys
-src, dst = sys.argv[1], sys.argv[2]
+src, dst, version = sys.argv[1], sys.argv[2], sys.argv[3]
 page = open(src).read()
 
 # Qt's stock showUi() sets the container (#screen) to display:none while the
@@ -231,8 +232,29 @@ page = page.replace(
     "        background: #fff; overflow: auto;\n"
     "      }", 1)
 
+# Version the generated runtime assets. Browsers otherwise keep an older
+# JavaScript/WASM pair after a deploy even when SensorDashboard.html itself is
+# fresh, which also leaves them running older configuration behavior.
+page = page.replace('src="SensorDashboard.js"',
+                    f'src="SensorDashboard.js?v={version}"', 1)
+page = page.replace('src="qtloader.js"',
+                    f'src="qtloader.js?v={version}"', 1)
+
 open(dst, "w").write(page)
 print("    (patched: container stays laid out, loading screen overlaid)")
+PYEOF
+}
+
+patch_javascript() {
+    local src="$1"
+    PATCHED_JS="$(mktemp -t sensordashboard-XXXXXX.js)"
+    python3 - "$src" "$PATCHED_JS" "$STAMP" <<'PYEOF'
+import sys
+src, dst, version = sys.argv[1], sys.argv[2], sys.argv[3]
+script = open(src).read()
+script = script.replace('SensorDashboard.wasm',
+                        f'SensorDashboard.wasm?v={version}')
+open(dst, 'w').write(script)
 PYEOF
 }
 
@@ -242,6 +264,10 @@ for f in "${REQUIRED_FILES[@]}"; do
         patch_loader "$BUILD_DIR/$f"
         scp "${SCP_OPTS[@]}" -q "$PATCHED_HTML" "$TARGET:$STAGING/$f"
         rm -f "$PATCHED_HTML"
+    elif [[ "$f" == "SensorDashboard.js" ]]; then
+        patch_javascript "$BUILD_DIR/$f"
+        scp "${SCP_OPTS[@]}" -q "$PATCHED_JS" "$TARGET:$STAGING/$f"
+        rm -f "$PATCHED_JS"
     else
         scp "${SCP_OPTS[@]}" -q "$BUILD_DIR/$f" "$TARGET:$STAGING/$f"
     fi

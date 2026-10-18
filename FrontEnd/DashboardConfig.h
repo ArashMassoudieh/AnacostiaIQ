@@ -69,6 +69,7 @@ public:
     int     defaultRangeDaysAhead() const { return m_rangeAhead; }
     bool    autoRefreshDefault() const{ return m_autoRefreshDefault; }
     bool    scrollableCharts() const  { return m_scrollable; }
+    bool    demoFallback() const      { return m_demoFallback; }
     QString windowTitle() const       { return m_windowTitle; }
     bool    cameraEnabled() const     { return m_cameraEnabled; }
     QString cameraStationId() const   { return m_cameraStationId; }
@@ -111,6 +112,7 @@ private:
     int     m_rangeAhead   = 7;
     bool    m_autoRefreshDefault = false;
     bool    m_scrollable   = false;
+    bool    m_demoFallback = false;
     QString m_windowTitle  = "Sensor Dashboard";
     bool    m_cameraEnabled = false;
     QString m_cameraStationId;

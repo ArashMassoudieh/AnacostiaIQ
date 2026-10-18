@@ -92,6 +92,7 @@ private:
     QJsonArray readingsInRange(const QString &sensorId,
                                const QDateTime &start,
                                const QDateTime &end) const;
+    QJsonArray demoReadings(const QString &sensorId) const;
     void completeSensorRequest();
     void updateChart(const QString &sensorId, const QJsonArray &dataArray);
     SensorChart &getOrCreateChart(const QString &sensorId);

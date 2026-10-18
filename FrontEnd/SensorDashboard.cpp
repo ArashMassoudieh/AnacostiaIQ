@@ -5,6 +5,7 @@
 #include <QPixmap>
 #include <QUrlQuery>
 #include <QJsonValue>
+#include <QtMath>
 #include <limits>
 
 SensorDashboard::SensorDashboard(const QString &configPath, QWidget *parent)
@@ -35,6 +36,10 @@ void SensorDashboard::fetchConfig()
 {
     // Relative URL → resolved against the page the .wasm was loaded from.
     QUrl url("config.json");
+    QUrlQuery configQuery;
+    configQuery.addQueryItem("v", QString::number(
+        QDateTime::currentMSecsSinceEpoch()));
+    url.setQuery(configQuery);
     QNetworkRequest request(url);
 
     QNetworkReply *reply = networkManager->get(request);
@@ -924,6 +929,59 @@ QJsonArray SensorDashboard::readingsInRange(const QString &sensorId,
     return filtered;
 }
 
+QJsonArray SensorDashboard::demoReadings(const QString &sensorId) const
+{
+    QJsonArray readings;
+    const QDateTime now = QDateTime::currentDateTime();
+    QDateTime start = startDateTimeEdit->dateTime();
+    QDateTime end = endDateTimeEdit->dateTime();
+    if (end > now)
+        end = now;
+    const QDateTime sixDaysAgo = end.addDays(-6);
+    if (start < sixDaysAgo)
+        start = sixDaysAgo;
+    if (end <= start)
+        start = end.addDays(-1);
+
+    const int sampleCount = 97;
+    const qint64 duration = qMax<qint64>(sampleCount - 1, start.secsTo(end));
+    for (int i = 0; i < sampleCount; ++i) {
+        const double x = double(i) / double(sampleCount - 1);
+        const double storm = qExp(-qPow((x - 0.55) / 0.075, 2.0));
+        const double shower = qExp(-qPow((x - 0.82) / 0.045, 2.0));
+        const double ripple = qSin(x * 18.0) * 0.025;
+        double value = 0.0;
+
+        if (sensorId == "hcsr04_depth") {
+            value = qMax(0.0, 0.18 + 2.10 * storm + 0.72 * shower + ripple);
+        } else if (sensorId == "inflow_flow_rate") {
+            const double head = qMax(0.0, 2.05 * storm + 0.68 * shower);
+            value = 1.35 * qPow(head, 2.5);
+        } else if (sensorId == "maxbotix_depth") {
+            const double delayedStorm = qExp(-qPow((x - 0.59) / 0.12, 2.0));
+            const double delayedShower = qExp(-qPow((x - 0.84) / 0.08, 2.0));
+            value = qMax(0.0, 0.42 + 5.10 * delayedStorm +
+                               1.25 * delayedShower + ripple);
+        } else if (sensorId == "moisture_sensor") {
+            const double wetting = 25.0 / (1.0 + qExp(-(x - 0.54) * 85.0));
+            const double drying = x > 0.62 ? (x - 0.62) * 17.0 : 0.0;
+            value = 38.0 + wetting - drying + qSin(x * 9.0) * 0.45;
+        } else {
+            value = 10.0 + qSin(x * 10.0);
+        }
+
+        const QDateTime timestamp = start.addSecs(
+            qRound64(double(duration) * x));
+        readings.append(QJsonObject{
+            {"timestamp", timestamp.toString(Qt::ISODate)},
+            {"value", value},
+            {"unit", config.unit(sensorId).isEmpty()
+                         ? QStringLiteral("Value") : config.unit(sensorId)}
+        });
+    }
+    return readings;
+}
+
 void SensorDashboard::completeSensorRequest()
 {
     pendingRequests--;
@@ -1040,13 +1098,15 @@ void SensorDashboard::updateChart(const QString &sensorId,
                                   const QJsonArray &dataArray)
 {
     SensorChart &sc = getOrCreateChart(sensorId);
+    const bool showingDemo = dataArray.isEmpty() && config.demoFallback();
+    const QJsonArray displayData = showingDemo ? demoReadings(sensorId) : dataArray;
     sc.series->clear();
 
     // Also clear the lower bound series of the area
     if (sc.area && sc.area->lowerSeries())
         sc.area->lowerSeries()->clear();
 
-    if (dataArray.isEmpty()) {
+    if (displayData.isEmpty()) {
         sc.chart->setTitle(friendlyName(sensorId) + "  (no data)");
         return;
     }
@@ -1057,7 +1117,7 @@ void SensorDashboard::updateChart(const QString &sensorId,
     QDateTime minTime, maxTime, latestTime;
     double latestValue = 0.0;
 
-    for (const QJsonValue &val : dataArray) {
+    for (const QJsonValue &val : displayData) {
         if (!val.isObject()) continue;
         QJsonObject reading = val.toObject();
 

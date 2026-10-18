@@ -155,6 +155,8 @@ bool DashboardConfig::loadFromData(const QByteArray &bytes)
         m_autoRefreshDefault = root.value("auto_refresh").toBool(m_autoRefreshDefault);
     if (root.contains("scrollable_charts"))
         m_scrollable = root.value("scrollable_charts").toBool(m_scrollable);
+    if (root.contains("demo_fallback"))
+        m_demoFallback = root.value("demo_fallback").toBool(m_demoFallback);
     if (root.contains("window_title"))
         m_windowTitle = root.value("window_title").toString(m_windowTitle);
 
