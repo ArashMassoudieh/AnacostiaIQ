@@ -102,6 +102,7 @@ private:
     void fetchCameraImage(const QUrl &url);
     void updateCameraImageScale();
     void updateHealthSummary();
+    void applyResponsiveLayout(const QSize &viewSize);
     void resizeEvent(QResizeEvent *event) override;
 
     // Display helpers — now thin wrappers over DashboardConfig so the
@@ -143,6 +144,8 @@ private:
     QPixmap cameraSourcePixmap;
     QSize cameraPixmapSize;
     QLabel *cameraStatus = nullptr;
+    QBoxLayout *cameraScheduleLayout = nullptr;
+    QBoxLayout *cameraActionsLayout = nullptr;
     QComboBox *cameraSchedule = nullptr;
     QPushButton *cameraScheduleButton = nullptr;
     QPushButton *cameraCaptureButton = nullptr;

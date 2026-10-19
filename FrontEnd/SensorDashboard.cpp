@@ -306,8 +306,8 @@ void SensorDashboard::setupUI()
     if (config.cameraEnabled()) {
         cameraGroup = new QGroupBox(config.cameraTitle(), this);
         QVBoxLayout *cameraLayout = new QVBoxLayout(cameraGroup);
-        QHBoxLayout *scheduleControls = new QHBoxLayout();
-        QHBoxLayout *cameraActions = new QHBoxLayout();
+        cameraScheduleLayout = new QHBoxLayout();
+        cameraActionsLayout = new QHBoxLayout();
         cameraImage = new QLabel("Waiting for the first camera image…", this);
         cameraImage->setAlignment(Qt::AlignCenter);
         cameraImage->setMinimumHeight(260);
@@ -316,6 +316,7 @@ void SensorDashboard::setupUI()
         cameraImage->setStyleSheet(
             "background:#15181d; border:1px solid #343a42; border-radius:8px;");
         cameraStatus = new QLabel("Loading camera status…", this);
+        cameraStatus->setWordWrap(true);
         cameraSchedule = new QComboBox(this);
         cameraSchedule->addItem("Off", 0);
         cameraSchedule->addItem("Every 1 hour", 1);
@@ -325,13 +326,13 @@ void SensorDashboard::setupUI()
         cameraScheduleButton = new QPushButton("Save schedule", this);
         cameraCaptureButton = new QPushButton("Capture now", this);
         QLabel *automaticLabel = new QLabel("Automatic:", this);
-        scheduleControls->addWidget(automaticLabel);
-        scheduleControls->addWidget(cameraSchedule, 1);
-        scheduleControls->addWidget(cameraScheduleButton);
-        cameraActions->addWidget(cameraCaptureButton);
-        cameraActions->addWidget(cameraStatus, 1);
-        cameraLayout->addLayout(scheduleControls);
-        cameraLayout->addLayout(cameraActions);
+        cameraScheduleLayout->addWidget(automaticLabel);
+        cameraScheduleLayout->addWidget(cameraSchedule, 1);
+        cameraScheduleLayout->addWidget(cameraScheduleButton);
+        cameraActionsLayout->addWidget(cameraCaptureButton);
+        cameraActionsLayout->addWidget(cameraStatus, 1);
+        cameraLayout->addLayout(cameraScheduleLayout);
+        cameraLayout->addLayout(cameraActionsLayout);
         cameraLayout->addWidget(cameraImage, 1);
         if (!config.cameraStaticImageUrl().isEmpty()) {
             automaticLabel->hide();
@@ -387,6 +388,7 @@ void SensorDashboard::setupUI()
         QVBoxLayout *healthLayout = new QVBoxLayout(healthGroup);
         const auto makeHealthRow = [this, healthLayout](const QString &name) {
             QLabel *label = new QLabel(name + ":  Checking…", this);
+            label->setWordWrap(true);
             label->setStyleSheet(
                 "background:#191d22; border:1px solid #303640; border-radius:6px;"
                 "padding:8px 10px; color:#b0bec5; font-weight:600;");
@@ -399,6 +401,7 @@ void SensorDashboard::setupUI()
         healthCloud = makeHealthRow("Cloud / API");
         healthQueue = makeHealthRow("Upload queue");
         healthUpdated = new QLabel("Loading current station health…", this);
+        healthUpdated->setWordWrap(true);
         healthUpdated->setStyleSheet("color:#607d8b; font-size:11px;");
         healthLayout->addWidget(healthUpdated);
         rightLayout->addWidget(healthGroup, 2);
@@ -450,15 +453,28 @@ void SensorDashboard::setupUI()
             this, &SensorDashboard::onFetchClicked);
     connect(autoRefreshCheckBox, &QCheckBox::toggled,
             this, &SensorDashboard::onAutoRefreshToggled);
+
+    // The browser can deliver its first resize while setupUI() is still
+    // constructing the scroll hierarchy. Apply the final viewport once the
+    // event loop starts so portrait phones cannot remain in the desktop grid.
+    QTimer::singleShot(0, this, [this]() {
+        applyResponsiveLayout(size());
+    });
 }
 
 void SensorDashboard::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
+    applyResponsiveLayout(event->size());
+}
+
+void SensorDashboard::applyResponsiveLayout(const QSize &viewSize)
+{
     if (!contentSplitter || !pageScrollArea)
         return;
 
-    const bool mobile = event->size().width() < 900;
+    const bool mobile = viewSize.width() < 900;
+    const bool portraitPhone = viewSize.width() < 600;
     const bool layoutChanged = !responsiveLayoutReady ||
                                mobile != mobileLayoutActive;
 
@@ -478,8 +494,8 @@ void SensorDashboard::resizeEvent(QResizeEvent *event)
         controlLayout->addWidget(endLabel, 1, 0);
         controlLayout->addWidget(endDateTimeEdit, 1, 1, 1, 3);
         controlLayout->addWidget(fetchButton, 2, 0, 1, 4);
-        controlLayout->addWidget(autoRefreshCheckBox, 3, 0, 1, 3);
-        controlLayout->addWidget(countdownLabel, 3, 3);
+        controlLayout->addWidget(autoRefreshCheckBox, 3, 0, 1, 4);
+        controlLayout->addWidget(countdownLabel, 4, 0, 1, 4);
 
         const int chartHeight = qMax(1, sensorIds.size()) * 330 + 12;
         chartsContainer->setMinimumHeight(chartHeight);
@@ -525,6 +541,23 @@ void SensorDashboard::resizeEvent(QResizeEvent *event)
         mobileLayoutActive = mobile;
         responsiveLayoutReady = true;
     }
+
+    // Lab camera controls fit side by side on tablets and desktop, but their
+    // combined minimum widths force a portrait phone canvas wider than the
+    // screen. Stack them only at phone widths.
+    if (cameraScheduleLayout) {
+        cameraScheduleLayout->setDirection(
+            portraitPhone ? QBoxLayout::TopToBottom
+                          : QBoxLayout::LeftToRight);
+    }
+    if (cameraActionsLayout) {
+        cameraActionsLayout->setDirection(
+            portraitPhone ? QBoxLayout::TopToBottom
+                          : QBoxLayout::LeftToRight);
+    }
+
+    if (cameraImage)
+        cameraImage->setMinimumHeight(portraitPhone ? 190 : 260);
 
     for (auto it = sensorCharts.begin(); it != sensorCharts.end(); ++it) {
         it.value().axisX->setTickCount(mobile ? 3 : 5);
