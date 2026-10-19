@@ -100,6 +100,7 @@ private:
     void setStatus(const QString &message);
     void updateCameraState(const QJsonObject &state);
     void fetchCameraImage(const QUrl &url);
+    void updateCameraImageScale();
     void updateHealthSummary();
     void resizeEvent(QResizeEvent *event) override;
 
@@ -139,6 +140,8 @@ private:
     // Optional lab camera panel
     QGroupBox *cameraGroup = nullptr;
     QLabel *cameraImage = nullptr;
+    QPixmap cameraSourcePixmap;
+    QSize cameraPixmapSize;
     QLabel *cameraStatus = nullptr;
     QComboBox *cameraSchedule = nullptr;
     QPushButton *cameraScheduleButton = nullptr;

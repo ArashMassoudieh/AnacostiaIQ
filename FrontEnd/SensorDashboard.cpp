@@ -458,6 +458,12 @@ void SensorDashboard::resizeEvent(QResizeEvent *event)
     const bool layoutChanged = !responsiveLayoutReady ||
                                mobile != mobileLayoutActive;
 
+    // Keep the canvas close to the viewport edge on phones while retaining a
+    // modest breathing space on desktop. Wide outer gutters make the panels
+    // appear to have inconsistent widths, especially beside the photo.
+    mainLayout->setContentsMargins(mobile ? 6 : 10, mobile ? 6 : 10,
+                                   mobile ? 6 : 10, mobile ? 6 : 10);
+
     if (layoutChanged && mobile) {
         contentSplitter->setOrientation(Qt::Vertical);
         // One continuous page scroll avoids competing nested scroll areas on
@@ -518,10 +524,14 @@ void SensorDashboard::resizeEvent(QResizeEvent *event)
 
     for (auto it = sensorCharts.begin(); it != sensorCharts.end(); ++it) {
         it.value().axisX->setTickCount(mobile ? 3 : 5);
+        it.value().chart->setMargins(mobile ? QMargins(4, 4, 4, 2)
+                                            : QMargins(8, 6, 8, 4));
         QFont titleFont = it.value().chart->titleFont();
         titleFont.setPixelSize(mobile ? 14 : 18);
         it.value().chart->setTitleFont(titleFont);
     }
+
+    updateCameraImageScale();
 }
 
 // ================================================================
@@ -682,13 +692,27 @@ void SensorDashboard::fetchCameraImage(const QUrl &url)
         if (reply->error() == QNetworkReply::NoError) {
             QPixmap pixmap;
             if (pixmap.loadFromData(reply->readAll(), "JPG")) {
-                cameraImage->setPixmap(pixmap.scaled(
-                    cameraImage->size(), Qt::KeepAspectRatio,
-                    Qt::SmoothTransformation));
+                cameraSourcePixmap = pixmap;
+                cameraPixmapSize = QSize();
+                updateCameraImageScale();
             }
         }
         reply->deleteLater();
     });
+}
+
+void SensorDashboard::updateCameraImageScale()
+{
+    if (!cameraImage || cameraSourcePixmap.isNull())
+        return;
+
+    const QSize target = cameraImage->contentsRect().size();
+    if (!target.isValid() || target == cameraPixmapSize)
+        return;
+
+    cameraImage->setPixmap(cameraSourcePixmap.scaled(
+        target, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    cameraPixmapSize = target;
 }
 
 // ================================================================
