@@ -119,6 +119,7 @@ private:
     QSplitter *contentSplitter = nullptr;
     QWidget *leftPane = nullptr;
     QWidget *rightPane = nullptr;
+    QScrollArea *rightScrollArea = nullptr;
 
     // Controls
     QGroupBox *controlGroup;

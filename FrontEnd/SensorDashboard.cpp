@@ -401,14 +401,26 @@ void SensorDashboard::setupUI()
     }
     rightLayout->addStretch();
     rightPane = new QWidget(this);
+    rightPane->setObjectName("dashboardRightPane");
+    rightPane->setStyleSheet(
+        "QWidget#dashboardRightPane { background-color:#1a1d23; }");
     rightPane->setLayout(rightLayout);
-    rightPane->setMinimumWidth(360);
+    rightScrollArea = new QScrollArea(this);
+    rightScrollArea->setWidgetResizable(true);
+    rightScrollArea->setFrameShape(QFrame::NoFrame);
+    rightScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    rightScrollArea->setWidget(rightPane);
+    rightScrollArea->setMinimumWidth(360);
+    QPalette rightViewportPalette = rightScrollArea->viewport()->palette();
+    rightViewportPalette.setColor(QPalette::Window, QColor("#1a1d23"));
+    rightScrollArea->viewport()->setPalette(rightViewportPalette);
+    rightScrollArea->viewport()->setAutoFillBackground(true);
 
     contentSplitter = new QSplitter(Qt::Horizontal, this);
     contentSplitter->setChildrenCollapsible(false);
     contentSplitter->setHandleWidth(8);
     contentSplitter->addWidget(leftPane);
-    contentSplitter->addWidget(rightPane);
+    contentSplitter->addWidget(rightScrollArea);
     contentSplitter->setStretchFactor(0, 7);
     contentSplitter->setStretchFactor(1, 4);
     contentSplitter->setSizes({760, 440});
