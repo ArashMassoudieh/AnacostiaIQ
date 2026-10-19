@@ -257,6 +257,10 @@ void SensorDashboard::setupUI()
     )");
 
     centralWidget = new QWidget(this);
+    QPalette rootPalette = centralWidget->palette();
+    rootPalette.setColor(QPalette::Window, QColor("#1a1d23"));
+    centralWidget->setPalette(rootPalette);
+    centralWidget->setAutoFillBackground(true);
     mainLayout = new QVBoxLayout(centralWidget);
     mainLayout->setContentsMargins(16, 16, 16, 16);
     mainLayout->setSpacing(10);
