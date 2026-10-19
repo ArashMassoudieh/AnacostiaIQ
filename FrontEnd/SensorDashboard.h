@@ -16,6 +16,7 @@
 #include <QScrollArea>
 #include <QSplitter>
 #include <QResizeEvent>
+#include <QScroller>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -116,13 +117,17 @@ private:
     // UI
     QWidget *centralWidget;
     QVBoxLayout *mainLayout;
+    QScrollArea *pageScrollArea = nullptr;
     QSplitter *contentSplitter = nullptr;
     QWidget *leftPane = nullptr;
     QWidget *rightPane = nullptr;
     QScrollArea *rightScrollArea = nullptr;
+    bool responsiveLayoutReady = false;
+    bool mobileLayoutActive = false;
 
     // Controls
     QGroupBox *controlGroup;
+    QGridLayout *controlLayout = nullptr;
     QLabel *startLabel;
     QDateTimeEdit *startDateTimeEdit;
     QLabel *endLabel;

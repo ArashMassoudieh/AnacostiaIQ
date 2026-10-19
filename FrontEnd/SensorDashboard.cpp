@@ -263,9 +263,9 @@ void SensorDashboard::setupUI()
 
     // === Control Panel ===
     controlGroup = new QGroupBox("Query Controls", this);
-    QGridLayout *controlRow = new QGridLayout(controlGroup);
-    controlRow->setHorizontalSpacing(10);
-    controlRow->setVerticalSpacing(8);
+    controlLayout = new QGridLayout(controlGroup);
+    controlLayout->setHorizontalSpacing(10);
+    controlLayout->setVerticalSpacing(8);
 
     startLabel = new QLabel("From:", this);
     startDateTimeEdit = new QDateTimeEdit(this);
@@ -289,15 +289,15 @@ void SensorDashboard::setupUI()
     countdownLabel = new QLabel("", this);
     countdownLabel->setStyleSheet("color: #546e7a; font-style: italic;");
 
-    controlRow->addWidget(startLabel, 0, 0);
-    controlRow->addWidget(startDateTimeEdit, 0, 1);
-    controlRow->addWidget(endLabel, 0, 2);
-    controlRow->addWidget(endDateTimeEdit, 0, 3);
-    controlRow->addWidget(fetchButton, 1, 0, 1, 2);
-    controlRow->addWidget(autoRefreshCheckBox, 1, 2);
-    controlRow->addWidget(countdownLabel, 1, 3);
-    controlRow->setColumnStretch(1, 1);
-    controlRow->setColumnStretch(3, 1);
+    controlLayout->addWidget(startLabel, 0, 0);
+    controlLayout->addWidget(startDateTimeEdit, 0, 1);
+    controlLayout->addWidget(endLabel, 0, 2);
+    controlLayout->addWidget(endDateTimeEdit, 0, 3);
+    controlLayout->addWidget(fetchButton, 1, 0, 1, 2);
+    controlLayout->addWidget(autoRefreshCheckBox, 1, 2);
+    controlLayout->addWidget(countdownLabel, 1, 3);
+    controlLayout->setColumnStretch(1, 1);
+    controlLayout->setColumnStretch(3, 1);
 
     if (config.cameraEnabled()) {
         cameraGroup = new QGroupBox(config.cameraTitle(), this);
@@ -426,7 +426,16 @@ void SensorDashboard::setupUI()
     contentSplitter->setSizes({760, 440});
     mainLayout->addWidget(contentSplitter, 1);
 
-    setCentralWidget(centralWidget);
+    pageScrollArea = new QScrollArea(this);
+    pageScrollArea->setWidgetResizable(true);
+    pageScrollArea->setFrameShape(QFrame::NoFrame);
+    pageScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    pageScrollArea->setWidget(centralWidget);
+    QPalette pagePalette = pageScrollArea->viewport()->palette();
+    pagePalette.setColor(QPalette::Window, QColor("#1a1d23"));
+    pageScrollArea->viewport()->setPalette(pagePalette);
+    pageScrollArea->viewport()->setAutoFillBackground(true);
+    setCentralWidget(pageScrollArea);
     statusBar()->showMessage(
         QString("Ready — default range: -%1 / +%2 days")
             .arg(config.defaultRangeDaysBack())
@@ -442,9 +451,77 @@ void SensorDashboard::setupUI()
 void SensorDashboard::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
-    if (contentSplitter)
-        contentSplitter->setOrientation(event->size().width() < 900
-                                        ? Qt::Vertical : Qt::Horizontal);
+    if (!contentSplitter || !pageScrollArea)
+        return;
+
+    const bool mobile = event->size().width() < 900;
+    const bool layoutChanged = !responsiveLayoutReady ||
+                               mobile != mobileLayoutActive;
+
+    if (layoutChanged && mobile) {
+        contentSplitter->setOrientation(Qt::Vertical);
+        // One continuous page scroll avoids competing nested scroll areas on
+        // touch browsers. Give each section its full content height and let
+        // pageScrollArea own vertical movement.
+        controlLayout->addWidget(startLabel, 0, 0);
+        controlLayout->addWidget(startDateTimeEdit, 0, 1, 1, 3);
+        controlLayout->addWidget(endLabel, 1, 0);
+        controlLayout->addWidget(endDateTimeEdit, 1, 1, 1, 3);
+        controlLayout->addWidget(fetchButton, 2, 0, 1, 4);
+        controlLayout->addWidget(autoRefreshCheckBox, 3, 0, 1, 3);
+        controlLayout->addWidget(countdownLabel, 3, 3);
+
+        const int chartHeight = qMax(1, sensorIds.size()) * 330 + 12;
+        chartsContainer->setMinimumHeight(chartHeight);
+        if (scrollArea) {
+            scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+            scrollArea->setMinimumHeight(chartHeight);
+        }
+        const int rightHeight = qMax(760, rightPane->sizeHint().height());
+        rightScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        rightScrollArea->setMinimumWidth(0);
+        rightScrollArea->setMinimumHeight(rightHeight);
+        contentSplitter->setMinimumHeight(
+            leftPane->sizeHint().height() + rightHeight +
+            contentSplitter->handleWidth());
+        if (pageScrollArea) {
+            QScroller::grabGesture(pageScrollArea->viewport(),
+                                   QScroller::TouchGesture);
+        }
+    } else if (layoutChanged) {
+        contentSplitter->setOrientation(Qt::Horizontal);
+        controlLayout->addWidget(startLabel, 0, 0);
+        controlLayout->addWidget(startDateTimeEdit, 0, 1);
+        controlLayout->addWidget(endLabel, 0, 2);
+        controlLayout->addWidget(endDateTimeEdit, 0, 3);
+        controlLayout->addWidget(fetchButton, 1, 0, 1, 2);
+        controlLayout->addWidget(autoRefreshCheckBox, 1, 2);
+        controlLayout->addWidget(countdownLabel, 1, 3);
+
+        chartsContainer->setMinimumHeight(0);
+        if (scrollArea) {
+            scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+            scrollArea->setMinimumHeight(0);
+        }
+        rightScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        rightScrollArea->setMinimumWidth(360);
+        rightScrollArea->setMinimumHeight(0);
+        contentSplitter->setMinimumHeight(0);
+        if (pageScrollArea)
+            QScroller::ungrabGesture(pageScrollArea->viewport());
+    }
+
+    if (layoutChanged) {
+        mobileLayoutActive = mobile;
+        responsiveLayoutReady = true;
+    }
+
+    for (auto it = sensorCharts.begin(); it != sensorCharts.end(); ++it) {
+        it.value().axisX->setTickCount(mobile ? 3 : 5);
+        QFont titleFont = it.value().chart->titleFont();
+        titleFont.setPixelSize(mobile ? 14 : 18);
+        it.value().chart->setTitleFont(titleFont);
+    }
 }
 
 // ================================================================
