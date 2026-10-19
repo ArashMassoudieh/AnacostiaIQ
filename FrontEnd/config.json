@@ -25,6 +25,17 @@
       "visible": false
     }
   ],
+  "health_components": [
+    {"id": "sensor_hcsr04_depth", "name": "Inflow Weir Head"},
+    {"id": "sensor_maxbotix_depth", "name": "Ponding Depth"},
+    {"id": "sensor_moisture_sensor", "name": "Soil Moisture"},
+    {"id": "application", "name": "Application"},
+    {"id": "cloud", "name": "Cloud / API"},
+    {"id": "upload_queue", "name": "Upload Queue"},
+    {"id": "storage", "name": "Storage"},
+    {"id": "cpu_temperature", "name": "CPU Temperature"},
+    {"id": "overall", "name": "Overall Station"}
+  ],
   "refresh_interval_sec": 60,
   "auto_refresh": false,
   "scrollable_charts": true,

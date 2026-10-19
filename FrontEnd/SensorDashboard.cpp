@@ -699,10 +699,17 @@ void SensorDashboard::updateHealthSummary()
             "padding:8px 10px; color:%1; font-weight:700;").arg(stateColor(state)));
     };
 
-    setRow(healthOverall, "Overall", healthStates.value("overall", -1));
-    setRow(healthApplication, "Application", healthStates.value("application", -1));
-    setRow(healthCloud, "Cloud / API", healthStates.value("cloud", -1));
-    setRow(healthQueue, "Upload queue", healthStates.value("upload_queue", -1));
+    const bool healthPreview = config.demoFallback() &&
+        healthStates.size() >= config.healthComponents().size();
+    const auto displayedState = [this, healthPreview](const QString &id) {
+        const int state = healthStates.value(id, -1);
+        return state < 0 && healthPreview ? 0 : state;
+    };
+
+    setRow(healthOverall, "Overall", displayedState("overall"));
+    setRow(healthApplication, "Application", displayedState("application"));
+    setRow(healthCloud, "Cloud / API", displayedState("cloud"));
+    setRow(healthQueue, "Upload queue", displayedState("upload_queue"));
 
     int sensorCount = 0;
     int healthyCount = 0;
@@ -711,10 +718,11 @@ void SensorDashboard::updateHealthSummary()
         if (!it.key().startsWith("sensor_"))
             continue;
         sensorCount++;
-        if (it.value() == 0)
+        const int state = it.value() < 0 && healthPreview ? 0 : it.value();
+        if (state == 0)
             healthyCount++;
-        if (it.value() > sensorWorst)
-            sensorWorst = it.value();
+        if (state > sensorWorst)
+            sensorWorst = state;
     }
     const QString sensorDetail = sensorCount == 0
         ? QString("Checking…")
