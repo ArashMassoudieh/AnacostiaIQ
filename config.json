@@ -58,7 +58,7 @@
   "_disabledSensors": [],
   "sensors": [
     {
-      "_comment": "LAB: RCWL-9610A-design trigger/echo ultrasonic board, identified by the user and operated from 3.3 V on 2026-11-02. GPIO17 (physical 11) is TRIG; GPIO18 (physical 12) is ECHO. Uses the existing distance driver. Keep lab_hcsr04_depth for data continuity. Supply and echo-level suitability must be checked for the exact board; older 5 V HC-SR04 modules still need echo protection.",
+      "_comment": "LAB: RCWL-9610A-design trigger/echo board identified by the user. On 2026-11-02 the user confirmed 3.3 V supply, TRIG directly to GPIO17 (physical 11), and ECHO directly to GPIO18 (physical 12), without the older divider. Uses the existing distance driver and lab_hcsr04_depth ID. Keep the older 5 V HC-SR04 protection instructions separate.",
       "type": "distance",
       "id": "lab_hcsr04_depth",
       "unit": "in",

@@ -1,7 +1,8 @@
 # Lab trigger/echo ultrasonic replacement
 
 On November 2, 2026 the user replaced the lab HC with an RCWL-9610A-design
-ultrasonic board and reported powering it from 3.3 V. Existing trigger/echo
+ultrasonic board and confirmed powering it from 3.3 V, with TRIG directly
+to GPIO17 and ECHO directly to GPIO18, without the old divider. Existing trigger/echo
 acquisition produced fresh readings. No new GPIO driver or protocol change is
 required for its current trigger/echo mode.
 
@@ -23,20 +24,31 @@ Hold a broad flat target at ruler-measured positions and compare inferred range
 `totalLength - reportedHead` only for positive, unclipped head values. A zero
 head can indicate a target beyond the reference and cannot reconstruct range.
 
-The RCWL chip marking alone is not a guarantee for every breakout's supply or
-echo-voltage limits. Verify the exact board and its printed pin labels. The lab
-was observed operating at user-reported 3.3 V. The older 5 V HC divider instructions
-remain applicable only to that older hardware; do not apply a 5 V output directly
-to Pi GPIO. Whether the old divider remains installed on this lab replacement
-must be confirmed physically; software cannot determine its wiring or peak voltage.
+## Confirmed wiring and reference photos
 
-A SparkFun-distributed HC-SR04-R datasheet shows a board marked RCWL-9610A design
-and specifies a 3.3–5 V supply, a trigger pulse of at least 10 microseconds and
-measurement cycles longer than 60 ms. It is a reference, not proof of the user's
-specific supplier/model. Keep the module in trigger/echo mode; alternate UART/I2C
-modes would require a separately verified interface and configuration.
+The user confirmed direct TRIG17/ECHO18 connections on the board at 3.3 V.
+No ECHO divider is used in this lab arrangement. The old 5 V HC instructions
+remain historical references, not the wiring for this replacement. Software
+cannot measure the physical peak ECHO voltage; retain proper protection for
+any different board that outputs 5 V.
 
-Reference: https://cdn.sparkfun.com/assets/6/7/a/d/1/Ultrasonic_Ranging_Module_HC-SR04-R__SEN-28798.pdf
+The previously saved SparkFun HC-SR04-33 / SEN-24049 product link has board
+front and rear reference photographs. The supplier rear photograph is marked
+RCWL-9610 design; the lab board was described by the user as RCWL-9610A design.
+These are product-reference photographs, not photographs of the installed lab
+wiring. Use the actual board markings for identification.
+
+Reference: https://www.sparkfun.com/catalog/product/view/id/8141
+
+The current trigger/echo driver is retained. A 10-microsecond trigger and spacing
+greater than 60 ms between samples are compatible with this interface. Alternate
+UART/I2C modes, if used later, require a separately verified configuration.
+
+## Commissioning observation
+
+At 14:13 EST on November 2, 2026, five consecutive readings were 9.07–9.23 inches
+of reported head over approximately 20 seconds, with healthy acquisition. This
+is a short stability observation, not a ruler-based accuracy calibration.
 
 Hardware tutorial sources and illustrations are kept in the shared JM Bioretention
 Dropbox, not committed here. Only software-facing configuration and operating
