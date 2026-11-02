@@ -116,3 +116,10 @@ docs/*.toc
 # Python bytecode
 __pycache__/
 *.py[cod]
+
+# Hardware tutorial sources and illustrations are maintained in shared Dropbox.
+/docs/hardware-tutorial/
+/docs/bmp390-barometer.md
+/docs/bmp390-tutorial-section.tex
+/docs/bmp390-photo-tutorial-section.tex
+/docs/figures/

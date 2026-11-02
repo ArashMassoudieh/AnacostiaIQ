@@ -19,6 +19,11 @@ instead of losing measurements.
 The web dashboard that visualizes this data is a separate Qt/WebAssembly app in
 [`FrontEnd/`](FrontEnd/README.md).
 
+Hardware assembly tutorials, their editable LaTeX sources, pictures and shareable
+PDFs are maintained in the shared **JM Bioretention Dropbox**, under
+**02 Documentation and Tutorials / New Build / 01 Current Tutorial**.
+Keep this repository focused on software, configuration examples and operating notes.
+
 ---
 
 ## 1. Which machine are you on?
