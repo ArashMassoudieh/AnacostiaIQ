@@ -3,7 +3,6 @@
 /////////////////////////////////////////////////////////////
 
 #include "MoistureSensorI2C.h"
-#include <cmath>
 
 MoistureSensorI2C::MoistureSensorI2C(const QString &id, const QString &unit,
                                      const QString &name,
@@ -64,5 +63,8 @@ double MoistureSensorI2C::measure() {
     qDebug() << "MoistureSensorI2C" << id() << ": raw =" << raw
              << "moisture =" << moisture << "%";
 
-    return std::round(moisture);
+    // HealthMonitor examines this value before display formatting. Rounding
+    // a valid 0.2% (or 99.8%) to a whole percent creates a false boundary
+    // reading and can incorrectly mark a communicating probe disconnected.
+    return moisture;
 }

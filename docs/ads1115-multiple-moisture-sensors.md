@@ -64,10 +64,38 @@ Use a unique `id`, display `name`, and channel for every probe:
 | A3 | 3 | `lab_moisture_a3` (available) |
 
 The example's `adcDry` and `adcWet` values are the provisional calibration
-used for A1 and A2. They keep the live channels away from a false 0% boundary
-alarm, but they are not quantitative calibration. Calibrate every probe
+used for A1 and A2. They are initial estimates, not quantitative calibration
+or evidence that a probe is connected. Calibrate every probe
 independently; component and soil variation can otherwise make the displayed
 percentage misleading.
+
+### Near-zero readings and false boundary alarms
+
+ADS1115 moisture readings retain fractional percentages through acquisition
+and health evaluation. For example, A2 raw `22964` with dry/wet endpoints
+`23000/6400` represents about `0.217%`. Rounding that to a whole percent
+before health evaluation used to turn it into repeated `0%` values and
+incorrectly trigger `sensor_disconnected_boundary_0.00`.
+
+The precision fix does not change calibration, fabricate moisture, or disable
+health alarms. Actual repeated 0/100% boundaries still trigger the existing
+heuristic, and I2C failures remain failed readings. A boundary alarm is not
+proof of a disconnected wire: inspect raw values and check calibration,
+probe supply, signal continuity, and response to a known moisture change.
+This percentage is a relative dry/wet mapping, not calibrated volumetric
+water content.
+
+The regression suite exercises the real acquisition and health code with a
+test ADC substitute, including near-dry/near-wet fractions, true boundaries,
+and communication failures. With desktop Qt and Qt Test installed, run from
+the repository root:
+
+```bash
+mkdir -p /tmp/anacostiaiq-moisture-test
+qmake6 tests/moisture_precision.pro -o /tmp/anacostiaiq-moisture-test/Makefile
+make -C /tmp/anacostiaiq-moisture-test -j2
+/tmp/anacostiaiq-moisture-test/moisture_precision_test -silent
+```
 
 ## Calibrate each probe
 
