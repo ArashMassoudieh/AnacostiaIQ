@@ -5,11 +5,26 @@
 #include <QJsonArray>
 #include <QFileInfo>
 #include <QDebug>
+#include <QTimeZone>
 
 DashboardConfig::DashboardConfig()
 {
     // No file loaded yet — built-in defaults (member initialisers)
     // are already in effect. load() may override them.
+}
+
+QDateTime DashboardConfig::readingTimestamp(const QString &timestamp) const
+{
+    QDateTime parsed = QDateTime::fromString(timestamp, Qt::ISODate);
+    if (m_timestampsUtc && parsed.timeSpec() == Qt::LocalTime)
+        parsed.setTimeZone(QTimeZone::UTC);
+    return parsed;
+}
+
+QString DashboardConfig::apiTimestamp(const QDateTime &timestamp) const
+{
+    return (m_timestampsUtc ? timestamp.toUTC() : timestamp)
+        .toString("yyyy-MM-dd'T'HH:mm:ss");
 }
 
 // --------------------------------------------------------------------
@@ -149,6 +164,10 @@ bool DashboardConfig::loadFromData(const QByteArray &bytes)
     }
     if (root.contains("project"))
         m_project = root.value("project").toString(m_project);
+    m_timestampsUtc = root.value("timestamp_timezone").toString()
+        .compare("UTC", Qt::CaseInsensitive) == 0;
+    m_dataStart = root.value("data_start").toString();
+    m_dataEnd = root.value("data_end").toString();
     if (root.contains("refresh_interval_sec"))
         m_refreshSec = root.value("refresh_interval_sec").toInt(m_refreshSec);
     if (root.contains("auto_refresh"))

@@ -7,6 +7,7 @@
 #include <QColor>
 #include <QMap>
 #include <QVector>
+#include <QDateTime>
 
 // ====================================================================
 //  DashboardConfig
@@ -70,6 +71,11 @@ public:
     bool    autoRefreshDefault() const{ return m_autoRefreshDefault; }
     bool    scrollableCharts() const  { return m_scrollable; }
     bool    demoFallback() const      { return m_demoFallback; }
+    // Naive API timestamps are UTC only for stations configured that way.
+    QDateTime readingTimestamp(const QString &timestamp) const;
+    QString apiTimestamp(const QDateTime &timestamp) const;
+    QDateTime dataStart() const { return readingTimestamp(m_dataStart); }
+    QDateTime dataEnd() const { return readingTimestamp(m_dataEnd); }
     QString windowTitle() const       { return m_windowTitle; }
     bool    cameraEnabled() const     { return m_cameraEnabled; }
     QString cameraStationId() const   { return m_cameraStationId; }
@@ -115,6 +121,9 @@ private:
     bool    m_autoRefreshDefault = false;
     bool    m_scrollable   = false;
     bool    m_demoFallback = false;
+    bool    m_timestampsUtc = false;
+    QString m_dataStart;
+    QString m_dataEnd;
     QString m_windowTitle  = "Sensor Dashboard";
     bool    m_cameraEnabled = false;
     QString m_cameraStationId;

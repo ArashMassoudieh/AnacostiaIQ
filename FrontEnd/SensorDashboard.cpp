@@ -275,15 +275,30 @@ void SensorDashboard::setupUI()
     startDateTimeEdit = new QDateTimeEdit(this);
     startDateTimeEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
     startDateTimeEdit->setCalendarPopup(true);
-    startDateTimeEdit->setDateTime(
-        QDateTime::currentDateTime().addDays(-config.defaultRangeDaysBack()));
 
     endLabel = new QLabel("To:", this);
     endDateTimeEdit = new QDateTimeEdit(this);
     endDateTimeEdit->setDisplayFormat("yyyy-MM-dd HH:mm");
     endDateTimeEdit->setCalendarPopup(true);
-    endDateTimeEdit->setDateTime(
-        QDateTime::currentDateTime().addDays(config.defaultRangeDaysAhead()));
+    // Keep bench records out of the current view and open an archived
+    // station around its last collection date rather than today's empty range.
+    const QDateTime dataStart = config.dataStart();
+    const QDateTime dataEnd = config.dataEnd();
+    for (QDateTimeEdit *control : {startDateTimeEdit, endDateTimeEdit}) {
+        if (dataStart.isValid())
+            control->setMinimumDateTime(dataStart.toLocalTime());
+        if (dataEnd.isValid())
+            control->setMaximumDateTime(dataEnd.toLocalTime());
+    }
+    const QDateTime now = QDateTime::currentDateTime();
+    QDateTime initialStart = now.addDays(-config.defaultRangeDaysBack());
+    QDateTime initialEnd = now.addDays(config.defaultRangeDaysAhead());
+    if (dataEnd.isValid() && initialEnd > dataEnd) {
+        initialEnd = dataEnd.toLocalTime();
+        initialStart = initialEnd.addDays(-config.defaultRangeDaysBack());
+    }
+    endDateTimeEdit->setDateTime(initialEnd);
+    startDateTimeEdit->setDateTime(initialStart);
 
     fetchButton = new QPushButton("Fetch Data", this);
 
@@ -768,13 +783,12 @@ void SensorDashboard::fetchHealthState()
 
     const QDateTime end = QDateTime::currentDateTime();
     const QDateTime start = end.addDays(-1);
-    const QString timestampFormat = "yyyy-MM-dd'T'HH:mm:ss";
 
     for (const HealthComponentDef &component : components) {
         QUrl url(apiUrl + "/sensor/health_" + stationId + "_" + component.id);
         QUrlQuery query;
-        query.addQueryItem("start", start.toString(timestampFormat));
-        query.addQueryItem("end", end.toString(timestampFormat));
+        query.addQueryItem("start", config.apiTimestamp(start));
+        query.addQueryItem("end", config.apiTimestamp(end));
         if (!project.isEmpty())
             query.addQueryItem("project", project);
         url.setQuery(query);
@@ -794,8 +808,8 @@ void SensorDashboard::fetchHealthState()
                 QDateTime newestTime;
                 for (const QJsonValue &value : readings) {
                     const QJsonObject reading = value.toObject();
-                    const QDateTime timestamp = QDateTime::fromString(
-                        reading.value("timestamp").toString(), Qt::ISODate);
+                    const QDateTime timestamp = config.readingTimestamp(
+                        reading.value("timestamp").toString());
                     if (!timestamp.isValid() ||
                         (newestTime.isValid() && timestamp <= newestTime))
                         continue;
@@ -988,15 +1002,10 @@ void SensorDashboard::fetchSensorData(const QString &sensorId)
                  << fetchStart << fetchEnd;
     }
 
-    // The deployed API stores its DynamoDB sort-key timestamps as local,
-    // timezone-free ISO strings (for example 2026-09-30T15:00:03). Sending
-    // these controls through toUTC() shifts a selected Eastern-time range by
-    // four or five hours and can make a valid historical window look empty.
-    // Preserve the wall-clock values shown in the dashboard and match the
-    // server's stored timestamp format exactly.
-    const QString apiTimestampFormat = "yyyy-MM-dd'T'HH:mm:ss";
-    query.addQueryItem("start", fetchStart.toString(apiTimestampFormat));
-    query.addQueryItem("end",   fetchEnd.toString(apiTimestampFormat));
+    // Match each station's storage convention while keeping controls local.
+    // Legacy stations use local wall-clock strings; the replacement uses UTC.
+    query.addQueryItem("start", config.apiTimestamp(fetchStart));
+    query.addQueryItem("end",   config.apiTimestamp(fetchEnd));
     // Without this the API serves legacy (unnamespaced) rows, so a project
     // dashboard would silently chart another project's data.
     if (!project.isEmpty())
@@ -1093,8 +1102,8 @@ QJsonArray SensorDashboard::readingsInRange(const QString &sensorId,
     QJsonArray filtered;
     const SensorDataCache cache = sensorDataCache.value(sensorId);
     for (const QJsonValue &value : cache.readings) {
-        const QDateTime timestamp = QDateTime::fromString(
-            value.toObject().value("timestamp").toString(), Qt::ISODate);
+        const QDateTime timestamp = config.readingTimestamp(
+            value.toObject().value("timestamp").toString());
         if (timestamp.isValid() && timestamp >= start && timestamp <= end)
             filtered.append(value);
     }
@@ -1294,7 +1303,7 @@ void SensorDashboard::updateChart(const QString &sensorId,
         QJsonObject reading = val.toObject();
 
         QString tsStr = reading["timestamp"].toString();
-        QDateTime ts = QDateTime::fromString(tsStr, Qt::ISODate);
+        QDateTime ts = config.readingTimestamp(tsStr);
         if (!ts.isValid()) continue;
 
         double v = 0.0;
