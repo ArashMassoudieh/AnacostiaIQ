@@ -26,6 +26,8 @@
     {"id": "sensor_lab_moisture_a1", "name": "Soil Moisture A1"},
     {"id": "sensor_lab_moisture_a2", "name": "Soil Moisture A2"},
     {"id": "sensor_lab_pressure_loop_current", "name": "Water-Level Transmitter Depth"},
+    {"id": "sensor_lab_barometer_pressure", "name": "Atmospheric Pressure"},
+    {"id": "sensor_lab_barometer_temperature", "name": "Barometer Temperature"},
     {"id": "application", "name": "Application"},
     {"id": "cloud", "name": "Cloud / API"},
     {"id": "upload_queue", "name": "Upload Queue"},
@@ -112,6 +114,24 @@
       "area_color": "#28bdbdbd",
       "floor_at_zero": false,
       "visible": false
+    },
+    {
+      "id": "lab_barometer_pressure",
+      "name": "Lab Atmospheric Pressure",
+      "unit": "hPa",
+      "color": "#29b6f6",
+      "area_color": "#2829b6f6",
+      "floor_at_zero": false,
+      "visible": true
+    },
+    {
+      "id": "lab_barometer_temperature",
+      "name": "Lab Barometer Temperature",
+      "unit": "degC",
+      "color": "#ef5350",
+      "area_color": "#28ef5350",
+      "floor_at_zero": false,
+      "visible": true
     }
   ]
 }

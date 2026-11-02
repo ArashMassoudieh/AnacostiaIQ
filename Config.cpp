@@ -1,3 +1,4 @@
+#include <QMap>
 /////////////////////////////////////////////////////////////
 // CONFIG.CPP - Config loading + sensor factory
 /////////////////////////////////////////////////////////////
@@ -6,6 +7,7 @@
 #include "DistanceSensor.h"
 #include "MoistureSensor.h"
 #include "MoistureSensorI2C.h"
+#include "Bmp390Sensor.h"
 #include "CurrentLoopSensorI2C.h"
 #include "MaxbotixSensor.h"
 #include "AdcBus.h"
@@ -173,6 +175,7 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
             ads.value("cacheMs").toInt(200));
     }
 
+    QMap<QString, std::shared_ptr<Bmp390Bus>> barometers;
     for (const QJsonValue &v : arr) {
         QJsonObject obj = v.toObject();
 
@@ -255,6 +258,21 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
                 id, unit, name, ads1115Bus, channel, shuntOhms,
                 validMinMa, validMaxMa, scaleOutput, currentMinMa,
                 currentMaxMa, outputMin, outputMax);
+        }
+        else if (type == "bmp390_pressure" || type == "bmp390_temperature") {
+            const QString device = params.value("device").toString("/dev/i2c-1");
+            bool ok = true;
+            const auto addressValue = params.value("address");
+            const int address = addressValue.isString() ? addressValue.toString().toInt(&ok, 0)
+                                                       : addressValue.toInt(0x77);
+            if (!ok || (address != 0x76 && address != 0x77)) {
+                qWarning() << "Config: invalid BMP390 address for" << id;
+                continue;
+            }
+            const QString key = device + ":" + QString::number(address);
+            if (!barometers.contains(key))
+                barometers[key] = std::make_shared<Bmp390Bus>(device, address);
+            sensor = new Bmp390Sensor(id, name, barometers[key], type == "bmp390_temperature");
         }
         else if (type == "maxbotix") {
             QString device     = params.value("device").toString("/dev/serial0");

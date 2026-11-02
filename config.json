@@ -193,6 +193,30 @@
         "device": "/dev/ttyAMA2",
         "totalLength": 48
       }
+    },
+    {
+      "type": "bmp390_pressure",
+      "id": "lab_barometer_pressure",
+      "name": "Lab atmospheric pressure",
+      "unit": "hPa",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "device": "/dev/i2c-1",
+        "address": "0x77"
+      }
+    },
+    {
+      "type": "bmp390_temperature",
+      "id": "lab_barometer_temperature",
+      "name": "Lab barometer temperature",
+      "unit": "degC",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "device": "/dev/i2c-1",
+        "address": "0x77"
+      }
     }
   ],
   "weirFlow": {

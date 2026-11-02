@@ -69,7 +69,7 @@ public:
                     std::chrono::milliseconds(INTER_SAMPLE_MS));
 
             const double v = measure();
-            if (isValid(v)) {
+            if (acceptsReading(v)) {
                 sum += v;
                 ++valid;
             }
@@ -87,7 +87,7 @@ public:
                 setAvailable(false);
             }
 #endif
-            return -1;
+            return invalidReading();
         }
 
         const double reading = sum / valid;
@@ -119,6 +119,9 @@ public:
 
         return reading;
     }
+
+    virtual bool acceptsReading(double value) const { return isValid(value); }
+    virtual double invalidReading() const { return -1; }
 
     virtual void cleanup() {}
 

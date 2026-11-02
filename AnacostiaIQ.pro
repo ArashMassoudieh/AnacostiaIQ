@@ -64,3 +64,7 @@ contains(DEFINES, RasPi) {
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DEFINES += BMP3_FLOAT_COMPENSATION
+SOURCES += Bmp390Sensor.cpp third_party/bmp3/bmp3.c
+HEADERS += Bmp390Sensor.h

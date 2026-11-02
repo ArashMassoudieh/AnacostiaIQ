@@ -64,3 +64,7 @@ HEADERS += \
 
 unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DEFINES += BMP3_FLOAT_COMPENSATION
+SOURCES += $$PWD/../Bmp390Sensor.cpp $$PWD/../third_party/bmp3/bmp3.c
+HEADERS += $$PWD/../Bmp390Sensor.h

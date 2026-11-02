@@ -175,7 +175,7 @@ void HeadlessMonitor::pollSensor(Sensor *s) {
 
     const double value = s->takeReading();
 
-    if (!Sensor::isValid(value)) {
+    if (!s->acceptsReading(value)) {
         qWarning().noquote()
             << QString("%1: no valid reading").arg(s->displayName());
         healthMonitor.evaluateNow();

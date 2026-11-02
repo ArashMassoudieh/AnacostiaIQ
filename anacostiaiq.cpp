@@ -523,7 +523,7 @@ void AnacostiaIQ::pollSensor(Sensor *s)
 
     const double value = s->takeReading();   // averages samplesPerReading samples
 
-    if (!Sensor::isValid(value)) {
+    if (!s->acceptsReading(value)) {
         // Available but no valid reading this tick.
         lastReadings.remove(s->id());
         if (c) {
