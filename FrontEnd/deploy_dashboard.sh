@@ -66,6 +66,7 @@ SITE_FILES=(
     "web/index.html"
     "web/field-site-overview.jpg"
     "config.json"
+    "config.previous.json"
 )
 
 # ── Parse flags ────────────────────────────────────────────────────
@@ -298,6 +299,20 @@ ssh "${SSH_OPTS[@]}" "$TARGET" "
     rm -rf '$STAGING'
 "
 
+# Preserve the previous publisher's namespace and date range in a separate
+# viewer. Runtime assets are shared; neither station's database is rewritten.
+ssh "${SSH_OPTS[@]}" "$TARGET" "
+    set -e
+    mkdir -p '$DOCROOT/previous-station'
+    cp '$DOCROOT/config.previous.json' '$DOCROOT/previous-station/config.next.json'
+    chmod 644 '$DOCROOT/previous-station/config.next.json'
+    mv '$DOCROOT/previous-station/config.next.json' '$DOCROOT/previous-station/config.json'
+    for f in SensorDashboard.html SensorDashboard.js SensorDashboard.wasm qtloader.js qtlogo.svg field-site-overview.jpg; do
+        ln -sfn ../\"\$f\" '$DOCROOT/previous-station/'\"\$f\"
+    done
+    ln -sfn SensorDashboard.html '$DOCROOT/previous-station/index.html'
+"
+
 # ── Make Apache serve the landing page at "/" ──────────────────────
 # The vhost from the deployment guide sets "DirectoryIndex
 # SensorDashboard.html", which sends "/" straight to the charts. Put
@@ -383,6 +398,8 @@ check_url "SensorDashboard.wasm" "application/wasm"  || rc=1
 check_url "SensorDashboard.js"   ""                  || rc=1
 check_url "qtloader.js"          ""                  || rc=1
 check_url "config.json"          "json"              || rc=1
+check_url "previous-station/SensorDashboard.html" "text/html" || rc=1
+check_url "previous-station/config.json" "json"       || rc=1
 
 # A 200 at "/" isn't enough: if DirectoryIndex still points only at
 # SensorDashboard.html, the root serves the charts and looks fine. Check

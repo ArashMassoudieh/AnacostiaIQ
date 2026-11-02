@@ -1,0 +1,79 @@
+{
+  "_comment": "Archived previous field station. Reads the verified unnamespaced legacy API records; never merges them with replacement station measurements.",
+  "api_url": "http://54.213.147.59:5000",
+  "_projectComment": "Must match \"project\" in the Pi-side config.json. Sent as ?project=... on every API call so this dashboard only shows one project's sensors. Leave empty or omit to view legacy (pre-project) readings.",
+  "project": "",
+  "health_application_stale_seconds": 600,
+  "window_title": "AnacostiaIQ — Previous Field Station",
+  "camera": {
+    "enabled": true,
+    "static_image": "field-site-overview.jpg",
+    "title": "Field Site View",
+    "caption": "John McCormack bioretention monitoring site"
+  },
+  "health_stations": [],
+  "health_components": [],
+  "refresh_interval_sec": 60,
+  "auto_refresh": false,
+  "scrollable_charts": true,
+  "demo_fallback": false,
+  "_demoFallbackComment": "Archive displays recorded measurements only.",
+  "default_range": {
+    "days_back": 7,
+    "days_ahead": 0
+  },
+  "_sensors_note": "Only the sensors listed here are shown, in this order. Use a plain string for defaults, or an object to override name/unit/colour/axis. Set visible:false to keep an entry on file but hide its chart. IMPORTANT: each id must match an id the Pi actually publishes (see the root config.json, and check GET /sensors on the API). A non-empty list here is treated as authoritative and suppresses sensor discovery entirely, so an id with no data behind it draws a permanently empty chart rather than being skipped.",
+  "sensors": [
+    {
+      "id": "hcsr04_depth",
+      "name": "Inflow Weir Head",
+      "unit": "in",
+      "color": "#26c6da",
+      "area_color": "#2826c6da",
+      "floor_at_zero": false
+    },
+    {
+      "_comment": "The MaxBotix MB7389-100 in the standpipe is read over the field Pi's electrically verified /dev/ttyAMA0 on GPIO15/RXD0 and uses GPIO25 for its trigger. A direct test of Sean's reference program repeatedly received the valid R5000 no-target sentinel on ttyAMA0, while /dev/serial0 produced no bytes. Production treats R5000 as zero ponding depth and healthy sensor communication.",
+      "id": "maxbotix_depth",
+      "name": "Ponding Depth",
+      "unit": "in",
+      "color": "#26a69a",
+      "area_color": "#2826a69a",
+      "floor_at_zero": false
+    },
+    {
+      "id": "moisture_sensor",
+      "name": "Soil Moisture",
+      "unit": "%",
+      "color": "#8d6e63",
+      "area_color": "#2d8d6e63",
+      "floor_at_zero": true
+    },
+    {
+      "id": "temperature",
+      "name": "Temperature",
+      "unit": "°C",
+      "color": "#ef5350",
+      "area_color": "#40ef5350",
+      "floor_at_zero": false
+    },
+    {
+      "id": "precip_amount",
+      "name": "Precipitation Amount",
+      "unit": "mm",
+      "color": "#42a5f5",
+      "area_color": "#2d42a5f5",
+      "floor_at_zero": true
+    },
+    {
+      "id": "precip_prob",
+      "name": "Precipitation Probability",
+      "unit": "%",
+      "color": "#ab47bc",
+      "area_color": "#28ab47bc",
+      "floor_at_zero": true
+    }
+  ],
+  "data_end": "2026-10-26T23:59:59",
+  "_archiveComment": "Last previous-station heartbeat: 2026-10-26T16:07:49 as stored (timezone-free legacy convention). Keep original timestamps unchanged."
+}

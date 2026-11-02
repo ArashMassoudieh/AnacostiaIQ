@@ -1,10 +1,10 @@
 {
-  "_comment": "Sensor Dashboard (viewer) configuration. Lists the same sensors defined on the Pi side so the dashboard charts them. Edit to choose which sensors appear and how they look — no recompile. Anything omitted falls back to a built-in default. Health stations are also config-driven so additional stations do not require dashboard code changes.",
+  "_comment": "Live field dashboard for the replacement Pi. Sensor and health IDs intentionally match its current staging profile; changing the viewer does not rename or rewrite stored readings.",
   "api_url": "http://54.213.147.59:5000",
   "_projectComment": "Must match \"project\" in the Pi-side config.json. Sent as ?project=... on every API call so this dashboard only shows one project's sensors. Leave empty or omit to view legacy (pre-project) readings.",
   "project": "John-McCormack",
   "health_application_stale_seconds": 600,
-  "window_title": "AnacostiaIQ — Sensor Dashboard",
+  "window_title": "AnacostiaIQ — John McCormack Field Dashboard",
   "camera": {
     "enabled": true,
     "static_image": "field-site-overview.jpg",
@@ -13,73 +13,133 @@
   },
   "health_stations": [
     {
-      "id": "field_station_01",
+      "id": "jm_cua_twin_pi_staging",
       "name": "John McCormack Field Station",
       "location": "John McCormack Rd NE · Washington, DC",
       "visible": true
-    },
-    {
-      "id": "lab_station_01",
-      "name": "CUA Lab Station",
-      "location": "Catholic University · Washington, DC",
-      "visible": false
     }
   ],
   "health_components": [
-    {"id": "sensor_hcsr04_depth", "name": "Inflow Weir Head"},
-    {"id": "sensor_maxbotix_depth", "name": "Ponding Depth"},
-    {"id": "sensor_moisture_sensor", "name": "Soil Moisture"},
-    {"id": "application", "name": "Application"},
-    {"id": "cloud", "name": "Cloud / API"},
-    {"id": "upload_queue", "name": "Upload Queue"},
-    {"id": "storage", "name": "Storage"},
-    {"id": "cpu_temperature", "name": "CPU Temperature"},
-    {"id": "overall", "name": "Overall Station"}
+    {
+      "id": "sensor_staging_hcsr04_depth",
+      "name": "Inflow Weir Head"
+    },
+    {
+      "id": "sensor_staging_maxbotix_depth",
+      "name": "Ponding Depth"
+    },
+    {
+      "id": "sensor_staging_moisture_sensor",
+      "name": "Soil Moisture 1 · A0"
+    },
+    {
+      "id": "sensor_staging_moisture_a1",
+      "name": "Soil Moisture 2 · A1"
+    },
+    {
+      "id": "sensor_staging_moisture_a2",
+      "name": "Soil Moisture 3 · A2"
+    },
+    {
+      "id": "application",
+      "name": "Application"
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud / API"
+    },
+    {
+      "id": "upload_queue",
+      "name": "Upload Queue"
+    },
+    {
+      "id": "storage",
+      "name": "Storage"
+    },
+    {
+      "id": "cpu_temperature",
+      "name": "CPU Temperature"
+    },
+    {
+      "id": "overall",
+      "name": "Overall Station"
+    }
   ],
-  "refresh_interval_sec": 60,
-  "auto_refresh": false,
+  "refresh_interval_sec": 30,
+  "auto_refresh": true,
   "scrollable_charts": true,
-  "demo_fallback": true,
-  "_demoFallbackComment": "Meeting/demo safety net: when a configured series has no API readings in the selected range, render clearly labelled simulated data in the browser. Synthetic values are never uploaded or stored. Set false after field telemetry returns.",
+  "demo_fallback": false,
+  "_demoFallbackComment": "Live monitoring: missing measurements remain missing; no synthetic charts or healthy preview states.",
   "default_range": {
-    "days_back": 7,
-    "days_ahead": 7
+    "days_back": 1,
+    "days_ahead": 0
   },
   "_sensors_note": "Only the sensors listed here are shown, in this order. Use a plain string for defaults, or an object to override name/unit/colour/axis. Set visible:false to keep an entry on file but hide its chart. IMPORTANT: each id must match an id the Pi actually publishes (see the root config.json, and check GET /sensors on the API). A non-empty list here is treated as authoritative and suppresses sensor discovery entirely, so an id with no data behind it draws a permanently empty chart rather than being skipped.",
   "sensors": [
     {
-      "id": "hcsr04_depth",
+      "id": "staging_hcsr04_depth",
       "name": "Inflow Weir Head",
       "unit": "in",
       "color": "#26c6da",
       "area_color": "#2826c6da",
-      "floor_at_zero": false
+      "floor_at_zero": false,
+      "_comment": "Replacement Pi acquisition ID. Field reference distances and moisture calibration remain provisional."
     },
     {
-      "_comment": "Derived at ingest from Inflow Weir Head using the configured V-notch equation. No values are published below the configured minimum credible head.",
+      "id": "staging_maxbotix_depth",
+      "name": "Ponding Depth",
+      "unit": "in",
+      "color": "#26a69a",
+      "area_color": "#2826a69a",
+      "floor_at_zero": false,
+      "_comment": "Replacement Pi acquisition ID. Field reference distances and moisture calibration remain provisional."
+    },
+    {
+      "id": "staging_moisture_sensor",
+      "name": "Soil Moisture 1 · A0",
+      "unit": "%",
+      "color": "#8d6e63",
+      "area_color": "#288d6e63",
+      "floor_at_zero": true,
+      "_comment": "Replacement Pi acquisition ID. Field reference distances and moisture calibration remain provisional."
+    },
+    {
+      "id": "staging_moisture_a1",
+      "name": "Soil Moisture 2 · A1",
+      "unit": "%",
+      "color": "#66bb6a",
+      "area_color": "#2866bb6a",
+      "floor_at_zero": true,
+      "_comment": "Replacement Pi acquisition ID. Field reference distances and moisture calibration remain provisional."
+    },
+    {
+      "id": "staging_moisture_a2",
+      "name": "Soil Moisture 3 · A2",
+      "unit": "%",
+      "color": "#ffa726",
+      "area_color": "#28ffa726",
+      "floor_at_zero": true,
+      "_comment": "Replacement Pi acquisition ID. Field reference distances and moisture calibration remain provisional."
+    },
+    {
+      "id": "staging_pressure_loop_current_raw",
+      "name": "Pressure Loop Current (uncalibrated)",
+      "unit": "mA",
+      "color": "#7e57c2",
+      "area_color": "#287e57c2",
+      "floor_at_zero": true,
+      "visible": false,
+      "_comment": "Enable only after the pressure transmitter is connected and validated; this is current, not calibrated depth."
+    },
+    {
+      "_comment": "Legacy derived flow is hidden until the replacement station weir geometry and derived series are configured and validated.",
       "id": "inflow_flow_rate",
       "name": "Inflow Flow Rate",
       "unit": "L/s",
       "color": "#29b6f6",
       "area_color": "#2829b6f6",
-      "floor_at_zero": true
-    },
-    {
-      "_comment": "The MaxBotix MB7389-100 in the standpipe is read over the field Pi's electrically verified /dev/ttyAMA0 on GPIO15/RXD0 and uses GPIO25 for its trigger. A direct test of Sean's reference program repeatedly received the valid R5000 no-target sentinel on ttyAMA0, while /dev/serial0 produced no bytes. Production treats R5000 as zero ponding depth and healthy sensor communication.",
-      "id": "maxbotix_depth",
-      "name": "Ponding Depth",
-      "unit": "in",
-      "color": "#26a69a",
-      "area_color": "#2826a69a",
-      "floor_at_zero": false
-    },
-    {
-      "id": "moisture_sensor",
-      "name": "Soil Moisture",
-      "unit": "%",
-      "color": "#8d6e63",
-      "area_color": "#2d8d6e63",
-      "floor_at_zero": true
+      "floor_at_zero": true,
+      "visible": false
     },
     {
       "id": "temperature",
@@ -105,5 +165,9 @@
       "area_color": "#28ab47bc",
       "floor_at_zero": true
     }
-  ]
+  ],
+  "timestamp_timezone": "UTC",
+  "_timestampComment": "Replacement Pi stores timezone-free UTC timestamps. Controls and chart labels remain in the viewer local time.",
+  "data_start": "2026-10-30T15:31:14Z",
+  "_commissioningComment": "First recorded replacement MaxBotix acquisition: 2026-10-30 11:31:14 EDT. Earlier staging/bench records remain stored but are excluded from this view."
 }
