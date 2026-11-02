@@ -19,7 +19,7 @@
     }
   ],
   "health_components": [
-    {"id": "sensor_lab_hcsr04_depth", "name": "Inflow Weir Head"},
+    {"id": "sensor_lab_hcsr04_depth", "name": "RCWL-9610A Ultrasonic Head"},
     {"id": "sensor_lab_maxbotix_depth_1", "name": "Original MB7389"},
     {"id": "sensor_lab_maxbotix_depth_2", "name": "New MB7389 B7604"},
     {"id": "sensor_lab_moisture_a0", "name": "Soil Moisture A0"},
@@ -45,7 +45,7 @@
   "sensors": [
     {
       "id": "lab_hcsr04_depth",
-      "name": "Lab HC-SR04 Head",
+      "name": "Lab RCWL-9610A Ultrasonic Head",
       "unit": "in",
       "color": "#26c6da",
       "area_color": "#2826c6da",

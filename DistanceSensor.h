@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////
-// DISTANCESENSOR.H - HC-SR04 ultrasonic sensor (libgpiod)
+// DISTANCESENSOR.H - Trigger/echo ultrasonic sensors (libgpiod)
 //
 //  Trigger/echo timing over GPIO using libgpiod (v2 C++ API).
 //  Reports water DEPTH directly: depth = totalLength − measured,

@@ -10,7 +10,7 @@ classes, `config.json`, cloud writer, upload queue and health monitor:
 | `AnacostiaIQ` | `AnacostiaIQ.pro` | Desktop GUI with live charts (Qt Widgets + Qt Charts) |
 | `anacostiaiqd` | `headless/anacostiaiqd.pro` | Console daemon for a Raspberry Pi with no display, run under systemd |
 
-Readings from the configured sensors (HC-SR04 ultrasonic, MaxBotix MB7389-100
+Readings from the configured sensors (HC-SR04-compatible trigger/echo ultrasonic, MaxBotix MB7389-100
 over UART, soil moisture and 4-20 mA transmitters via an ADS1115 I²C ADC) and a weather forecast
 (Open-Meteo or NOAA) are pushed to the cloud API declared in `config.json`.
 Every record is queued on disk first, so an Internet outage delays delivery
@@ -23,6 +23,8 @@ Hardware assembly tutorials, their editable LaTeX sources, pictures and shareabl
 PDFs are maintained in the shared **JM Bioretention Dropbox**, under
 **02 Documentation and Tutorials / New Build / 01 Current Tutorial**.
 Keep this repository focused on software, configuration examples and operating notes.
+The lab's RCWL-9610A trigger/echo replacement is described in
+[`docs/lab-ultrasonic.md`](docs/lab-ultrasonic.md).
 
 ---
 

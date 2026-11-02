@@ -58,11 +58,11 @@
   "_disabledSensors": [],
   "sensors": [
     {
-      "_comment": "HC-SR04, per HC_SR04_ultrasonic_sensor_4/main.cpp: TRIG on GPIO17 (header pin 11), ECHO on GPIO18 (header pin 12). TRIG was previously GPIO15, which collides with UART0 RXD that the MB7389-100 entry below needs — GPIO17 is free in this pin map. Rewire TRIG from header pin 10 to header pin 11 on the Pi to match. Published with lab-specific ID lab_hcsr04_depth so cloud data cannot mix with the field station.",
+      "_comment": "LAB: RCWL-9610A-design trigger/echo ultrasonic board, identified by the user and operated from 3.3 V on 2026-11-02. GPIO17 (physical 11) is TRIG; GPIO18 (physical 12) is ECHO. Uses the existing distance driver. Keep lab_hcsr04_depth for data continuity. Supply and echo-level suitability must be checked for the exact board; older 5 V HC-SR04 modules still need echo protection.",
       "type": "distance",
       "id": "lab_hcsr04_depth",
       "unit": "in",
-      "name": "Inflow Weir Head",
+      "name": "Lab RCWL-9610A Ultrasonic Head",
       "intervalSeconds": 5,
       "samplesPerReading": 10,
       "params": {

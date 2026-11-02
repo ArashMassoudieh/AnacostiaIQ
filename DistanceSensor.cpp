@@ -1,10 +1,10 @@
 /////////////////////////////////////////////////////////////
-// DISTANCESENSOR.CPP - HC-SR04 ultrasonic sensor (libgpiod)
+// DISTANCESENSOR.CPP - Trigger/echo ultrasonic sensors (libgpiod)
 //
-//  Pin connections (Pi -> HC-SR04):
-//    5V      -> VCC
+//  Pin connections (Pi -> configured trigger/echo board):
+//    Supply  -> VCC (lab RCWL-9610A-design board: 3.3 V)
 //    TRIG    <- GPIO trigPin  (output)
-//    ECHO    -> GPIO echoPin  (input)
+//    ECHO    -> GPIO echoPin  (input; voltage protection for 5 V boards)
 //    GND     -> GND
 //
 //  Uses libgpiod v2 C++ API (gpiod.hpp), matching the validated
