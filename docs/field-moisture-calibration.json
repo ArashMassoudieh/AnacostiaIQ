@@ -1,0 +1,55 @@
+{
+  "_comment": "Calibration record only, not a complete daemon configuration. Values below are applied to the active field config.json sensor params. Preserve station identity, wiring, and other settings when using this record.",
+  "station_id": "jm_cua_twin_pi_staging",
+  "project": "John-McCormack",
+  "adopted_date": "2026-11-03",
+  "status": "provisional_shared_lab_baseline",
+  "reference": {
+    "station": "CUA lab",
+    "channel": 0,
+    "bench_test_date": "2026-09-17",
+    "dry_condition": "air",
+    "adcDry": 17155,
+    "adcWet": 6400,
+    "dry_voltage_approx": 2.144,
+    "wet_voltage_approx": 0.8
+  },
+  "adc": {
+    "device": "/dev/i2c-1",
+    "address": "0x48",
+    "fsVoltage": 4.096,
+    "dataRateSps": 128
+  },
+  "sensors": [
+    {
+      "id": "staging_moisture_sensor",
+      "channel": 0,
+      "adcDry": 17155,
+      "adcWet": 6400
+    },
+    {
+      "id": "staging_moisture_a1",
+      "channel": 1,
+      "adcDry": 17155,
+      "adcWet": 6400
+    },
+    {
+      "id": "staging_moisture_a2",
+      "channel": 2,
+      "adcDry": 17155,
+      "adcWet": 6400
+    }
+  ],
+  "limitations": [
+    "Relative dry/wet index, not calibrated volumetric water content.",
+    "Baseline was measured on one lab probe, not separately on these installed field probes and full cables.",
+    "A2 intermittent signal jumps remain unresolved; this baseline does not establish accuracy or fix hardware.",
+    "Historical readings remain unchanged; percentages after adoption use the new mapping."
+  ],
+  "deployment": {
+    "applied_at_utc": "2026-11-03T19:15:16Z",
+    "backup_directory": "/home/behzad/field-setup/moisture-baseline-20261103T191511Z",
+    "changes": "A0 numeric endpoints unchanged; A1/A2 dry endpoint changed from 23000 to 17155; all wet endpoints remain 6400.",
+    "validation": "Daemon restarted successfully; all three moisture channels healthy with fresh readings after loading the configuration."
+  }
+}
