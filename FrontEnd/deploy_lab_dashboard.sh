@@ -43,6 +43,7 @@ ssh "${SSH_OPTS[@]}" "$TARGET" "
     cp '$REMOTE_ROOT/'\"\$f\" '$STAGING/'
   done
   test ! -f '$REMOTE_ROOT/qtlogo.svg' || cp '$REMOTE_ROOT/qtlogo.svg' '$STAGING/'
+  cp '$REMOTE_ROOT/enviroinformatics-logo.png' '$STAGING/'
   cp '$REMOTE_ROOT/SensorDashboard.html' '$STAGING/index.html'
 "
 

@@ -65,6 +65,7 @@ OPTIONAL_FILES=(
 SITE_FILES=(
     "web/index.html"
     "web/field-site-overview.jpg"
+    "web/enviroinformatics-logo.png"
     "config.json"
     "config.previous.json"
 )
@@ -196,6 +197,15 @@ import sys
 src, dst, version = sys.argv[1], sys.argv[2], sys.argv[3]
 page = open(src).read()
 
+# Keep original Qt copyright notices; customize only visible loader branding.
+import re
+page = re.sub(r'<img\b[^>]*src="(?:qtlogo\.svg|enviroinformatics-logo\.png)(?:\?[^" ]*)?"[^>]*>(?:</img>)?',
+              '<img src="enviroinformatics-logo.png?v=20261104" '
+              'alt="EnviroInformatics" width="240" height="240" '
+              'style="display:block;width:240px;max-width:80vw;height:auto;margin:0 auto 16px">', page)
+page = page.replace('Qt for WebAssembly: SensorDashboard', 'AnacostiaIQ Sensor Dashboard')
+page = page.replace('<title>SensorDashboard</title>', '<title>AnacostiaIQ Sensor Dashboard</title>')
+
 # Qt's stock showUi() sets the container (#screen) to display:none while the
 # loading spinner is up. The WASM platform plugin measures that container to
 # size its canvas, and a display:none element measures 0x0 — so Qt builds a
@@ -307,7 +317,7 @@ ssh "${SSH_OPTS[@]}" "$TARGET" "
     cp '$DOCROOT/config.previous.json' '$DOCROOT/previous-station/config.next.json'
     chmod 644 '$DOCROOT/previous-station/config.next.json'
     mv '$DOCROOT/previous-station/config.next.json' '$DOCROOT/previous-station/config.json'
-    for f in SensorDashboard.html SensorDashboard.js SensorDashboard.wasm qtloader.js qtlogo.svg field-site-overview.jpg; do
+    for f in SensorDashboard.html SensorDashboard.js SensorDashboard.wasm qtloader.js qtlogo.svg enviroinformatics-logo.png field-site-overview.jpg; do
         ln -sfn ../\"\$f\" '$DOCROOT/previous-station/'\"\$f\"
     done
     ln -sfn SensorDashboard.html '$DOCROOT/previous-station/index.html'
