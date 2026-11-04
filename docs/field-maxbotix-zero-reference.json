@@ -1,0 +1,28 @@
+{
+  "_comment": "Deployment reference record only; not a complete daemon configuration. Apply totalLength to the matching field MaxBotix sensor params.",
+  "station_id": "jm_cua_twin_pi_staging",
+  "project": "John-McCormack",
+  "sensor_id": "staging_maxbotix_depth",
+  "adopted_date": "2026-11-04",
+  "status": "provisional_user_assumed_zero",
+  "device": "/dev/ttyAMA2",
+  "unit": "in",
+  "previous_totalLength": 48.0,
+  "totalLength": 85.43307086614173,
+  "reference_range_mm": 2170,
+  "observed_raw_range_mm": {
+    "minimum": 2167,
+    "maximum": 2171,
+    "frames": 34,
+    "duration_seconds": 5
+  },
+  "basis": "User instructed that the current target represents zero water; expected mounting distance 85-86 inches. Not independently surveyed.",
+  "conversion": "depth_in = max(0, totalLength - range_mm / 25.4); existing protocol sentinel handling is unchanged.",
+  "backup_directory": "/home/behzad/field-setup/maxbotix-zero-20261104T164702Z",
+  "validation": "Daemon restarted; sensor healthy and fresh post-change depth readings 0 inches.",
+  "limitations": [
+    "Confirm sensor-face-to-zero-water reference by physical measurement.",
+    "Zero-clamped readings do not distinguish a target below the reference from exact zero water.",
+    "Historical measurements remain unchanged."
+  ]
+}
