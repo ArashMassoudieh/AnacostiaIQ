@@ -971,10 +971,22 @@ void SensorDashboard::fetchSensorData(const QString &sensorId)
     const QDateTime displayStart = startDateTimeEdit->dateTime();
     const QDateTime displayEnd   = endDateTimeEdit->dateTime();
 
+    // Keep short inspections raw; larger views target roughly 2,000 points.
+    const qint64 span = displayStart.secsTo(displayEnd);
+    int aggregationSeconds = 0;
+    if (span > 6 * 3600) {
+        for (const int seconds : {60, 300, 900, 1800, 3600, 21600, 86400}) {
+            aggregationSeconds = seconds;
+            if (span / seconds <= 2000)
+                break;
+        }
+    }
+
     // Reuse a complete range already held in this page session. This makes a
     // repeated Fetch Data click instant and avoids another API transfer.
     const auto cacheIt = sensorDataCache.constFind(sensorId);
     if (cacheIt != sensorDataCache.cend() && cacheIt->initialized &&
+        cacheIt->aggregationSeconds == aggregationSeconds &&
         displayStart >= cacheIt->coveredStart &&
         displayEnd <= cacheIt->coveredEnd) {
         qDebug() << "Sensor cache hit:" << sensorId
@@ -991,9 +1003,19 @@ void SensorDashboard::fetchSensorData(const QString &sensorId)
     // Auto-refresh normally keeps the same start and advances only the end.
     // Fetch just that new tail and merge it into the existing readings.
     if (cacheIt != sensorDataCache.cend() && cacheIt->initialized &&
+        cacheIt->aggregationSeconds == aggregationSeconds &&
         displayStart >= cacheIt->coveredStart &&
         displayEnd > cacheIt->coveredEnd) {
         fetchStart = cacheIt->coveredEnd;
+        if (aggregationSeconds > 0) {
+            // Re-fetch the complete last bucket so an updated partial mean
+            // replaces it instead of appending a duplicate or averaging means.
+            const QDateTime wall = QDateTime::fromString(
+                config.apiTimestamp(fetchStart), Qt::ISODate);
+            const qint64 seconds = (wall.date().toJulianDay() - 2440588LL) * 86400
+                                 + QTime(0, 0).secsTo(wall.time());
+            fetchStart = fetchStart.addSecs(-(seconds % aggregationSeconds));
+        }
         replaceCache = false;
         qDebug() << "Incremental sensor fetch:" << sensorId
                  << fetchStart << fetchEnd;
@@ -1006,6 +1028,8 @@ void SensorDashboard::fetchSensorData(const QString &sensorId)
     // Legacy stations use local wall-clock strings; the replacement uses UTC.
     query.addQueryItem("start", config.apiTimestamp(fetchStart));
     query.addQueryItem("end",   config.apiTimestamp(fetchEnd));
+    if (aggregationSeconds > 0)
+        query.addQueryItem("interval_seconds", QString::number(aggregationSeconds));
     // Without this the API serves legacy (unnamespaced) rows, so a project
     // dashboard would silently chart another project's data.
     if (!project.isEmpty())
@@ -1017,9 +1041,9 @@ void SensorDashboard::fetchSensorData(const QString &sensorId)
     QNetworkReply *reply = networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this,
             [this, sensorId, reply, displayStart, displayEnd,
-             fetchStart, fetchEnd, replaceCache]() {
+             fetchStart, fetchEnd, replaceCache, aggregationSeconds]() {
         onDataReceived(sensorId, reply, displayStart, displayEnd,
-                       fetchStart, fetchEnd, replaceCache);
+                       fetchStart, fetchEnd, replaceCache, aggregationSeconds);
     });
 }
 
@@ -1029,7 +1053,7 @@ void SensorDashboard::onDataReceived(const QString &sensorId,
                                      const QDateTime &displayEnd,
                                      const QDateTime &fetchStart,
                                      const QDateTime &fetchEnd,
-                                     bool replaceCache)
+                                     bool replaceCache, int aggregationSeconds)
 {
     if (!reply) return;
 
@@ -1080,6 +1104,7 @@ void SensorDashboard::onDataReceived(const QString &sensorId,
                 cache.coveredEnd = fetchEnd;
         }
         cache.initialized = true;
+        cache.aggregationSeconds = aggregationSeconds;
 
         updateChart(sensorId, readingsInRange(sensorId, displayStart, displayEnd));
     } else {
@@ -1279,6 +1304,7 @@ void SensorDashboard::updateChart(const QString &sensorId,
                                   const QJsonArray &dataArray)
 {
     SensorChart &sc = getOrCreateChart(sensorId);
+    sc.chartView->setToolTip(QString());
     const bool showingDemo = dataArray.isEmpty() && config.demoFallback();
     const QJsonArray displayData = showingDemo ? demoReadings(sensorId) : dataArray;
     sc.series->clear();
@@ -1353,7 +1379,13 @@ void SensorDashboard::updateChart(const QString &sensorId,
     double absLatest = qAbs(latestValue);
     int decimals = absLatest >= 100.0 ? 0 : (absLatest >= 10.0 ? 1 : 2);
     QString latestText = QString::number(latestValue, 'f', decimals);
-    sc.chart->setTitle(QString("%1  —  Latest: %2 %3  ·  %4 readings")
+    const int bucket = showingDemo ? 0 : sensorDataCache.value(sensorId).aggregationSeconds;
+    sc.chartView->setToolTip(bucket > 0
+        ? QString("Each point is a %1-minute average. Latest shows the most recent "
+                  "average, not an instantaneous reading. Select six hours or less "
+                  "to inspect the original recorded readings.").arg(bucket / 60)
+        : QString("Original recorded readings for the selected period."));
+    sc.chart->setTitle(QString("%1  —  Latest: %2 %3  ·  %4 points")
                            .arg(friendlyName(sensorId))
                            .arg(latestText)
                            .arg(uLabel)

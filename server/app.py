@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import time
 import uuid
+from history_summary import summarize_history
 
 app = Flask(__name__)
 CORS(app)
@@ -244,9 +245,35 @@ def get_sensor_data(sensor_id):
     end = request.args.get('end')
     project = request.args.get('project')
 
+    # Raw history remains the default. Dashboards opt in to bounded time
+    # buckets; health events must retain their original reasons and timing.
+    interval_text = request.args.get('interval_seconds')
+    if interval_text is not None:
+        try:
+            interval = int(interval_text)
+        except ValueError:
+            return jsonify({'error': 'interval_seconds must be an integer'}), 400
+        if not 60 <= interval <= 86400 or not start or not end:
+            return jsonify({'error': 'summaries require start, end and interval_seconds from 60 to 86400'}), 400
+        if sensor_id.startswith('health_'):
+            return jsonify({'error': 'health history cannot be averaged'}), 400
+        items = _history_items(_key_condition(_storage_key(project, sensor_id), start, end))
+        return jsonify([_public_item(i) for i in summarize_history(items, interval)]), 200
+
     items = _query_all(_key_condition(_storage_key(project, sensor_id),
                                       start, end))
     return jsonify([_public_item(i) for i in items]), 200
+
+
+def _history_items(condition):
+    """Stream DynamoDB query pages rather than materializing raw history."""
+    options = {'KeyConditionExpression': condition}
+    while True:
+        page = table.query(**options)
+        yield from page['Items']
+        if 'LastEvaluatedKey' not in page:
+            break
+        options['ExclusiveStartKey'] = page['LastEvaluatedKey']
 
 
 @app.route('/sensor/<sensor_id>', methods=['DELETE'])

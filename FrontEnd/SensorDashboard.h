@@ -54,6 +54,7 @@ struct SensorDataCache {
     QDateTime coveredStart;
     QDateTime coveredEnd;
     bool initialized = false;
+    int aggregationSeconds = 0;
 };
 
 class SensorDashboard : public QMainWindow
@@ -89,7 +90,7 @@ private:
                         const QDateTime &displayEnd,
                         const QDateTime &fetchStart,
                         const QDateTime &fetchEnd,
-                        bool replaceCache);
+                        bool replaceCache, int aggregationSeconds);
     QJsonArray readingsInRange(const QString &sensorId,
                                const QDateTime &start,
                                const QDateTime &end) const;

@@ -2,7 +2,6 @@
   "_comment": "AnacostiaIQ configuration. Edit this file to add/repin sensors, choose a weather source, or change app settings — no recompile needed. GPIO pins are BCM line offsets. Each sensor (and weather) may set its own 'intervalSeconds'; omit it to use app.pollIntervalSeconds. Each sensor may also set 'samplesPerReading': one reported reading is then the mean of that many samples taken back to back (failed samples are dropped, and 60 ms separates consecutive ones). Omit it for 1, i.e. no averaging. Raising it lengthens the blocking read proportionally, so keep intervalSeconds well above samplesPerReading x the time one sample takes.",
   "_projectComment": "Namespaces this station's data in the shared cloud database. The API stores readings under \"<project>#<sensor_id>\", so two projects may use identical sensor ids without overwriting each other. Omit or leave empty to post unnamespaced (legacy) readings.",
   "project": "John-McCormack",
-
   "station": {
     "id": "lab_station_01",
     "name": "CUA Lab Station"
@@ -31,8 +30,8 @@
     }
   },
   "adaptive": {
-    "_comment": "When no forecast point in the next 'lookaheadHours' exceeds 'rainProbabilityThreshold' percent, every sensor's intervalSeconds is multiplied by 'idleFactor' (low-frequency mode). Rain in the forecast restores the base intervals. The weather poll itself is never scaled — it's what notices rain returning. Set enabled=false to pin the base intervals, or idleFactor=1 for the same effect.",
-    "enabled": true,
+    "_comment": "Disabled for fixed one-minute sensor cadence. Other adaptive settings are retained for deliberate future use.",
+    "enabled": false,
     "idleFactor": 10,
     "rainProbabilityThreshold": 0,
     "lookaheadHours": 24
@@ -63,8 +62,8 @@
       "id": "lab_hcsr04_depth",
       "unit": "in",
       "name": "Lab RCWL-9610A Ultrasonic Head",
-      "intervalSeconds": 5,
-      "samplesPerReading": 10,
+      "intervalSeconds": 60,
+      "samplesPerReading": 5,
       "params": {
         "chip": "/dev/gpiochip0",
         "trigPin": 17,
@@ -120,7 +119,7 @@
       "type": "current_loop_ads1115",
       "unit": "in",
       "name": "Water-Level Transmitter Depth",
-      "intervalSeconds": 10,
+      "intervalSeconds": 60,
       "samplesPerReading": 3,
       "params": {
         "circuit": {
@@ -159,7 +158,7 @@
       "type": "current_loop_ads1115",
       "unit": "mA",
       "name": "Water-Level Transmitter Loop Current (raw)",
-      "intervalSeconds": 10,
+      "intervalSeconds": 60,
       "samplesPerReading": 3,
       "params": {
         "circuit": {
@@ -176,11 +175,12 @@
       "id": "lab_maxbotix_depth_1",
       "unit": "in",
       "name": "MB7389-100 Depth",
-      "intervalSeconds": 5,
+      "intervalSeconds": 60,
       "params": {
         "device": "/dev/ttyAMA0",
         "totalLength": 48
-      }
+      },
+      "samplesPerReading": 5
     },
     {
       "_comment": "LAB PI NEW MB7389-100 (label B7604): powered from 3.3 V, sensor pin 5 TTL serial wired directly to GPIO5 / UART2 RX (physical pin 29), and pin 4 left open for continuous ranging. Requires dtoverlay=uart2-pi5 and /dev/ttyAMA2. This is separate from the installed inverted-polarity unit on /dev/ttyAMA0. Published with lab-specific ID lab_maxbotix_depth_2 so cloud data cannot mix with the field station.",
@@ -188,11 +188,12 @@
       "id": "lab_maxbotix_depth_2",
       "unit": "in",
       "name": "New MB7389-100 Depth",
-      "intervalSeconds": 5,
+      "intervalSeconds": 60,
       "params": {
         "device": "/dev/ttyAMA2",
         "totalLength": 48
-      }
+      },
+      "samplesPerReading": 5
     },
     {
       "type": "bmp390_pressure",
