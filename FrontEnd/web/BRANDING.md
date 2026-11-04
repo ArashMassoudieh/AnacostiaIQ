@@ -5,3 +5,5 @@
 Source: https://openhydroqual.com/wp-content/UsersManual/OpenHydroQual_User_s_Manual.pdf
 
 The field deployment script uses this image in the generated WebAssembly loading screen; the lab deployment copies the branded loader and logo. The historical dashboard deployment also includes the asset. Qt copyright and license notices are retained. The logo is served locally so the dashboard does not depend on an external image host.
+
+`qtlogo.svg` is a compatibility wrapper containing the same original image. It replaces the generated Qt asset so older cached loader HTML also displays EnviroInformatics when it retrieves that URL.

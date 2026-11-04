@@ -66,6 +66,7 @@ SITE_FILES=(
     "web/index.html"
     "web/field-site-overview.jpg"
     "web/enviroinformatics-logo.png"
+    "web/qtlogo.svg"
     "config.json"
     "config.previous.json"
 )
