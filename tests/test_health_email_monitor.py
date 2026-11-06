@@ -102,3 +102,17 @@ class EmailTimezoneTests(unittest.TestCase):
         with patch.dict(os.environ, {"ANACOSTIAIQ_ALERT_TIMESTAMPS_UTC": "true", "ANACOSTIAIQ_ALERT_TIMEZONE": "America/New_York"}):
             self.assertEqual(monitor.email_time("2026-11-06T13:00:00"), "2026-11-06 08:00:00 AM EST (UTC-0500)")
             self.assertEqual(monitor.email_time("2026-07-06T13:00:00+00:00"), "2026-07-06 09:00:00 AM EDT (UTC-0400)")
+
+class UploadDelayTests(unittest.TestCase):
+    def test_transient_warning_and_sustained_failure(self):
+        from datetime import timedelta
+        now = datetime(2026, 11, 6, 15)
+        record = {"state": "healthy"}
+        with patch.dict(os.environ, {"ANACOSTIAIQ_UPLOAD_ALERT_DELAY_SECONDS": "300"}):
+            self.assertTrue(monitor.upload_alarm_pending(record, "degraded", now))
+            self.assertTrue(monitor.upload_alarm_pending(record, "degraded", now + timedelta(seconds=299)))
+            self.assertFalse(monitor.upload_alarm_pending(record, "degraded", now + timedelta(seconds=300)))
+            self.assertFalse(monitor.upload_alarm_pending(record, "healthy", now))
+            self.assertNotIn("pending_since", record)
+            self.assertTrue(monitor.upload_alarm_pending(record, "degraded", now))
+            self.assertFalse(monitor.upload_alarm_pending(record, "critical", now))

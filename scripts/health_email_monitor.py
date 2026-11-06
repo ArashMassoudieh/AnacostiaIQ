@@ -157,6 +157,21 @@ def parse_time(value: str | None) -> datetime | None:
         return None
 
 
+def upload_alarm_pending(record: dict, current: str, now: datetime) -> bool:
+    """Hold transient queue warnings without advancing the notified state."""
+    if current not in ALARM_STATES or current == "critical":
+        record.pop("pending_since", None)
+        return False
+    if record.get("state") in ALARM_STATES:
+        return False
+    since = parse_time(record.get("pending_since"))
+    if since is None:
+        since = now
+        record["pending_since"] = now.isoformat(timespec="seconds")
+    delay = max(0, int(os.getenv("ANACOSTIAIQ_UPLOAD_ALERT_DELAY_SECONDS", "300")))
+    return (now - since).total_seconds() < delay
+
+
 def email_time(value: str | None = None) -> str:
     """Display email times in the station timezone, including DST and offset."""
     zone = ZoneInfo(os.getenv("ANACOSTIAIQ_ALERT_TIMEZONE", "America/New_York"))
@@ -281,6 +296,10 @@ def main() -> int:
             now = datetime.now()
             old_record = previous.get(component, {})
             old = old_record.get("state")
+            if component == "upload_queue" and old_record and upload_alarm_pending(old_record, current, now):
+                old_record["checked_at"] = now.isoformat(timespec="seconds")
+                changed = True
+                continue
             alarm_since = old_record.get("alarm_since")
             last_notified_at = old_record.get("last_notified_at")
             if current in ALARM_STATES and old not in ALARM_STATES:

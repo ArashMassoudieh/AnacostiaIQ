@@ -112,3 +112,8 @@ disabled to prevent duplicate messages.
 Email display times use `ANACOSTIAIQ_ALERT_TIMEZONE` (default
 `America/New_York`), with EST/EDT and the UTC offset shown explicitly.
 Telemetry queries and heartbeat calculations retain their UTC convention.
+
+Upload queue degraded/offline emails require a continuous warning for
+`ANACOSTIAIQ_UPLOAD_ALERT_DELAY_SECONDS` (default 300 seconds). A short
+warning that clears sends neither alarm nor recovery. Critical queue states
+bypass this delay; other component alerts retain their existing timing.
