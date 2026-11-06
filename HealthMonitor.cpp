@@ -123,27 +123,23 @@ void HealthMonitor::evaluate()
             }
         }
 
-        // Explicit physical-disconnect detection for configured moisture
-        // probes. This is intentionally independent of the ADC transport
-        // (legacy GPIO ADC or ADS1115): a disconnected/open probe can still
-        // produce a syntactically valid calibrated boundary value of 0 or
-        // 100 %. One/two repeated boundary readings are suspicious; three or
-        // more indicate a likely disconnected/open sensor.
-        if ((level == Healthy || level == Degraded) &&
+        // A calibrated endpoint is not evidence of physical disconnection:
+        // rain can legitimately saturate the wet reference, and provisional
+        // endpoints can clamp an otherwise valid signal. The wet limit is
+        // informational (normal during rain); keep a dry-limit calibration
+        // warning without hiding acquisition errors.
+        if (level == Healthy &&
             sensor->id().contains("moisture", Qt::CaseInsensitive) &&
             sensor->hasLastValue() &&
             (sensor->lastValue() <= 0.01 || sensor->lastValue() >= 99.99)) {
             const int rails = sensor->identicalValidReadings();
-            if (rails >= m_thresholds.moistureOfflineBoundaryReadings) {
-                level = Offline;
-                reason = QString("sensor_disconnected_boundary_%1")
-                             .arg(sensor->lastValue(), 0, 'f', 2);
-            } else if (rails >= m_thresholds.moistureDegradedBoundaryReadings) {
-                level = Degraded;
-                reason = QString("suspect_boundary_%1_%2_of_%3")
-                             .arg(sensor->lastValue(), 0, 'f', 2)
-                             .arg(rails)
-                             .arg(m_thresholds.moistureOfflineBoundaryReadings);
+            if (rails >= m_thresholds.moistureDegradedBoundaryReadings) {
+                if (sensor->lastValue() >= 99.99) {
+                    reason = "wet_limit_reached";
+                } else {
+                    level = Degraded;
+                    reason = "dry_limit_reached_check_calibration";
+                }
             }
         }
 

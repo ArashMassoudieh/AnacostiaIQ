@@ -45,9 +45,13 @@ backward compatibility. Both the web dashboard and email monitor display it.
 
 - sensor: two consecutive completely-invalid readings -> degraded; unavailable
   or stale for more than max(60 s, 3 x configured poll interval) -> offline;
-- moisture boundary detection: repeated calibrated 0% or 100% readings are
-  treated as suspicious after one reading and offline after three identical
-  boundary readings; this check is ADC-transport-independent;
+- moisture calibration limits: valid 100% readings remain healthy, with the
+  informational reason `wet_limit_reached` after the configured boundary count
+  (default one). Rain can legitimately reach the wet reference. Valid 0%
+  readings receive a degraded `dry_limit_reached_check_calibration` warning.
+  Neither endpoint becomes offline solely because it repeats. A limit is not proof of a
+  disconnected probe. Unavailable/stale acquisition and recovery failures
+  retain their normal severity and reason. This check is ADC-independent;
 - cloud: one or two consecutive failed writes -> degraded; three or more ->
   offline;
 - upload queue: 500 pending -> degraded; 2000 pending -> critical;
@@ -57,6 +61,8 @@ backward compatibility. Both the web dashboard and email monitor display it.
 All of these defaults can be overridden under `health.thresholds` in the
 station configuration. Missing settings retain the defaults, so existing field
 configuration files remain compatible.
+The legacy `moistureOfflineBoundaryReadings` key remains accepted for config
+compatibility but no longer escalates calibrated endpoints to offline.
 
 ## Portal alarms
 

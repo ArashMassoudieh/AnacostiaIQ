@@ -27,7 +27,7 @@ public:
         int sensorStaleMinimumSeconds = 60;
         int sensorStalePollFactor = 3;
         int moistureDegradedBoundaryReadings = 1;
-        int moistureOfflineBoundaryReadings = 3;
+        int moistureOfflineBoundaryReadings = 3; // Legacy config compatibility; endpoints no longer imply offline.
         int cloudDegradedFailures = 1;
         int cloudOfflineFailures = 3;
         int queueDegraded = 500;

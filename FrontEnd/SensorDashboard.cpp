@@ -1405,8 +1405,13 @@ void SensorDashboard::updateChart(const QString &sensorId,
 
     // Don't go below zero for floored sensors
     double lowerBound = floorAtZero(sensorId) ? 0.0 : (yMin - pad);
-    sc.axisY->setRange(lowerBound, yMax + pad);
-    sc.axisY->setLabelFormat(qAbs(yMax + pad) >= 100.0 ? "%.0f" : "%.1f");
+    double upperBound = yMax + pad;
+    if (sensorId.contains("moisture", Qt::CaseInsensitive) && uLabel == "%") {
+        lowerBound = 0.0;
+        upperBound = qMin(100.0, upperBound);
+    }
+    sc.axisY->setRange(lowerBound, upperBound);
+    sc.axisY->setLabelFormat(qAbs(upperBound) >= 100.0 ? "%.0f" : "%.1f");
 
     // X axis
     if (minTime.isValid() && maxTime.isValid())

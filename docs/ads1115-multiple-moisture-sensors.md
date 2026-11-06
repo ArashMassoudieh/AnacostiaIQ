@@ -78,12 +78,18 @@ before health evaluation used to turn it into repeated `0%` values and
 incorrectly trigger `sensor_disconnected_boundary_0.00`.
 
 The precision fix does not change calibration, fabricate moisture, or disable
-health alarms. Actual repeated 0/100% boundaries still trigger the existing
-heuristic, and I2C failures remain failed readings. A boundary alarm is not
-proof of a disconnected wire: inspect raw values and check calibration,
+health alarms. Repeated valid 100% readings remain healthy with an informational
+`wet_limit_reached` reason; rain can legitimately reach the wet reference.
+Repeated 0% readings report a degraded dry-limit calibration warning. Neither
+endpoint causes an offline/disconnected state by itself. I2C failures remain failed
+readings; unavailable and stale acquisition still report offline. A boundary
+warning is not proof of a disconnected wire: inspect raw values and calibration,
 probe supply, signal continuity, and response to a known moisture change.
 This percentage is a relative dry/wet mapping, not calibrated volumetric
 water content.
+Moisture chart axes are bounded at 0% and at most 100% on both dashboards;
+automatic axis padding no longer creates labels above 100%. This display
+limit does not rewrite stored measurements or change calibration.
 
 The regression suite exercises the real acquisition and health code with a
 test ADC substitute, including near-dry/near-wet fractions, true boundaries,
