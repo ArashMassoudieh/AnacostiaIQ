@@ -18,7 +18,7 @@ import smtplib
 import ssl
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
@@ -40,6 +40,7 @@ DEFAULT_COMPONENTS = [
     "sensor_moisture_sensor",
 ]
 COMPONENT_LABELS = {
+    "monitor_api": "Monitoring API",
     "application": "Application",
     "overall": "Overall Health",
     "cloud": "Cloud / API",
@@ -50,6 +51,12 @@ COMPONENT_LABELS = {
     "sensor_maxbotix_depth": "Original MaxBotix Depth",
     "sensor_maxbotix_depth_2": "New MaxBotix Depth",
     "sensor_moisture_sensor": "Soil Moisture / ADC",
+    "sensor_staging_hcsr04_depth": "Inflow Weir Head",
+    "sensor_staging_maxbotix_depth": "MaxBotix Ponding Depth",
+    "sensor_staging_moisture_sensor": "Soil Moisture A0",
+    "sensor_staging_moisture_a1": "Soil Moisture A1",
+    "sensor_staging_moisture_a2": "Soil Moisture A2",
+    "sensor_staging_pressure_loop_current_raw": "Pressure Transmitter Loop Current",
 }
 
 
@@ -86,9 +93,14 @@ def parse_csv_env(name: str, default: list[str]) -> list[str]:
 
 
 def latest_reading(api_base: str, sensor_id: str, lookback_hours: int) -> dict | None:
-    end = datetime.now()
+    end = (datetime.now(timezone.utc).replace(tzinfo=None)
+           if env_bool("ANACOSTIAIQ_ALERT_TIMESTAMPS_UTC") else datetime.now())
     start = end - timedelta(hours=lookback_hours)
-    query = urlencode({"start": start.isoformat(), "end": end.isoformat()})
+    parameters = {"start": start.isoformat(), "end": end.isoformat()}
+    project = os.getenv("ANACOSTIAIQ_PROJECT", "").strip()
+    if project:
+        parameters["project"] = project
+    query = urlencode(parameters)
     url = f"{api_base.rstrip('/')}/sensor/{sensor_id}?{query}"
     with urlopen(url, timeout=10) as response:
         payload = json.loads(response.read().decode("utf-8"))
@@ -109,6 +121,8 @@ def reading_state(reading: dict | None, component: str, stale_seconds: int) -> t
     if component == "application" and timestamp:
         try:
             ts = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+            if ts.tzinfo is None and env_bool("ANACOSTIAIQ_ALERT_TIMESTAMPS_UTC"):
+                ts = ts.replace(tzinfo=timezone.utc)
             now = datetime.now(ts.tzinfo) if ts.tzinfo else datetime.now()
             age = (now - ts).total_seconds()
             if age > stale_seconds:
@@ -119,6 +133,18 @@ def reading_state(reading: dict | None, component: str, stale_seconds: int) -> t
     if not reason or reason == "state":
         reason = f"health state code {code}"
     return state, str(reason), timestamp
+
+
+def monitoring_api_error(api_base: str) -> str | None:
+    """Probe separately so an API outage is not misreported as a dead Pi."""
+    try:
+        with urlopen(f"{api_base.rstrip('/')}/health", timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if payload.get("status") != "ok":
+            return "monitoring API returned an unhealthy status"
+    except Exception as exc:
+        return f"monitoring API unreachable: {type(exc).__name__}"
+    return None
 
 
 def parse_time(value: str | None) -> datetime | None:
@@ -197,6 +223,7 @@ def main() -> int:
     station_name = os.getenv("ANACOSTIAIQ_ALERT_STATION_NAME", "John McCormack Field Station")
     location = os.getenv("ANACOSTIAIQ_ALERT_STATION_LOCATION", "John McCormack Rd NE · Washington, DC")
     components = parse_csv_env("ANACOSTIAIQ_ALERT_COMPONENTS", DEFAULT_COMPONENTS)
+    components = ["monitor_api"] + [c for c in components if c != "monitor_api"]
     poll_seconds = max(30, int(os.getenv("ANACOSTIAIQ_ALERT_POLL_SECONDS", "60")))
     stale_seconds = max(60, int(os.getenv("ANACOSTIAIQ_APPLICATION_STALE_SECONDS", "600")))
     lookback_hours = max(1, int(os.getenv("ANACOSTIAIQ_ALERT_LOOKBACK_HOURS", "24")))
@@ -205,6 +232,8 @@ def main() -> int:
     enabled = env_bool("ANACOSTIAIQ_EMAIL_ALERTS_ENABLED", False)
 
     state = load_json(state_path, {"components": {}})
+    if state.get("station_id") not in (None, station_id):
+        state = {"components": {}}
     previous = state.setdefault("components", {})
     first_cycle = not bool(previous)
 
@@ -212,14 +241,25 @@ def main() -> int:
 
     while True:
         changed = False
+        api_error = monitoring_api_error(api_base)
+        state["api_failures"] = int(state.get("api_failures", 0)) + 1 if api_error else 0
         for component in components:
             sensor_id = f"health_{station_id}_{component}"
-            try:
-                reading = latest_reading(api_base, sensor_id, lookback_hours)
-                current, reason, timestamp = reading_state(reading, component, stale_seconds)
-            except Exception as exc:
-                print(f"WARN {sensor_id}: {exc}", file=sys.stderr, flush=True)
+            if component == "monitor_api":
+                current = "offline" if state["api_failures"] >= 3 else "healthy"
+                reason = api_error or "monitoring API reachable"
+                timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            elif api_error:
+                # Retain station states during API failure; one independent
+                # API alarm suffices and avoids inventing sensor outages.
                 continue
+            else:
+                try:
+                    reading = latest_reading(api_base, sensor_id, lookback_hours)
+                    current, reason, timestamp = reading_state(reading, component, stale_seconds)
+                except Exception as exc:
+                    print(f"WARN {sensor_id}: {type(exc).__name__}", file=sys.stderr, flush=True)
+                    continue
 
             now = datetime.now()
             old_record = previous.get(component, {})

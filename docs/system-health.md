@@ -84,3 +84,27 @@ on GPIO15/RXD0. On the field Pi this header UART has been directly verified as
 `/dev/ttyAMA0`; `/dev/serial0` produced no frames. The MB7389 `R5000` sentinel
 means no target is detected, so production reports zero ponding depth while
 retaining healthy sensor communication.
+
+### Field email monitor deployment
+
+Run the monitor on the always-on API server so a Pi outage does not stop
+notifications. The replacement field station is `jm_cua_twin_pi_staging` in
+project `John-McCormack`. Set `ANACOSTIAIQ_PROJECT` and
+`ANACOSTIAIQ_ALERT_TIMESTAMPS_UTC=true`: field telemetry uses naive UTC
+timestamps. The example environment lists the replacement station components;
+`overall` is omitted to avoid duplicate aggregate alarms.
+
+Checks run every 60 seconds. An application heartbeat older than 600 seconds
+raises an offline alarm. Three consecutive failed API probes raise a separate
+API alarm; station states are retained during that outage. A healthy transition
+sends one recovery message. The initial run establishes a silent baseline.
+Repeated reminders are disabled. SMTP settings and recipients stay in a private
+mode-600 environment file and must never be committed.
+
+For a standalone server installation, copy the script to
+`~/anacostiaiq-alerts/health_email_monitor.py`, adapt the service ExecStart to
+that path, and create `~/.local/state/anacostiaiq` before starting the unit.
+Enable user lingering so the user service starts at boot without a login.
+Use `--test-email` with the same private environment to verify SMTP acceptance
+before enabling the continuous service. Keep other copies of the monitor
+disabled to prevent duplicate messages.
