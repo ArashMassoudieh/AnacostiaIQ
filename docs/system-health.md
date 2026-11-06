@@ -108,3 +108,7 @@ Enable user lingering so the user service starts at boot without a login.
 Use `--test-email` with the same private environment to verify SMTP acceptance
 before enabling the continuous service. Keep other copies of the monitor
 disabled to prevent duplicate messages.
+
+Email display times use `ANACOSTIAIQ_ALERT_TIMEZONE` (default
+`America/New_York`), with EST/EDT and the UTC offset shown explicitly.
+Telemetry queries and heartbeat calculations retain their UTC convention.

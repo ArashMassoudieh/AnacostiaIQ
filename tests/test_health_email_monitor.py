@@ -96,3 +96,9 @@ class EmailMonitorTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class EmailTimezoneTests(unittest.TestCase):
+    def test_eastern_standard_and_daylight_times(self):
+        with patch.dict(os.environ, {"ANACOSTIAIQ_ALERT_TIMESTAMPS_UTC": "true", "ANACOSTIAIQ_ALERT_TIMEZONE": "America/New_York"}):
+            self.assertEqual(monitor.email_time("2026-11-06T13:00:00"), "2026-11-06 08:00:00 AM EST (UTC-0500)")
+            self.assertEqual(monitor.email_time("2026-07-06T13:00:00+00:00"), "2026-07-06 09:00:00 AM EDT (UTC-0400)")

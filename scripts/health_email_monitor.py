@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
@@ -156,6 +157,22 @@ def parse_time(value: str | None) -> datetime | None:
         return None
 
 
+def email_time(value: str | None = None) -> str:
+    """Display email times in the station timezone, including DST and offset."""
+    zone = ZoneInfo(os.getenv("ANACOSTIAIQ_ALERT_TIMEZONE", "America/New_York"))
+    if value is None:
+        ts = datetime.now(timezone.utc)
+    else:
+        ts = parse_time(value)
+        if ts is None:
+            return "unknown"
+        if ts.tzinfo is None:
+            if not env_bool("ANACOSTIAIQ_ALERT_TIMESTAMPS_UTC"):
+                return f"{value} (source timezone unspecified)"
+            ts = ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(zone).strftime("%Y-%m-%d %I:%M:%S %p %Z (UTC%z)")
+
+
 def send_email(subject: str, body: str) -> None:
     host = os.environ["ANACOSTIAIQ_SMTP_HOST"]
     port = int(os.getenv("ANACOSTIAIQ_SMTP_PORT", "587"))
@@ -210,7 +227,7 @@ def main() -> int:
             f"Station: {station_name}\n"
             f"Station ID: {station_id}\n"
             f"Location: {location}\n"
-            f"Test time: {datetime.now().isoformat(timespec='seconds')}\n\n"
+            f"Test time: {email_time()}\n\n"
             "This is a test message. No health alarm was generated.\n\n"
             "Health dashboard: http://54.213.147.59/health.html\n"
         )
@@ -324,7 +341,7 @@ def main() -> int:
                 f"Component: {label}\n"
                 f"Previous state: {old}\n"
                 f"Current state: {current}\n"
-                f"Telemetry time: {timestamp or 'unknown'}\n"
+                f"Telemetry time: {email_time(timestamp) if timestamp else 'unknown'}\n"
                 f"Reason: {reason}\n\n"
                 f"Health dashboard: http://54.213.147.59/health.html\n"
             )
