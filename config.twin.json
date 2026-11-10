@@ -70,20 +70,6 @@
       }
     },
     {
-      "_comment": "Diagnostic twin of staging_hcsr04_depth, publishing the raw measured distance (no totalLength, so no depth conversion applied). Lets the sensor's raw reading be checked directly, independent of the configured standpipe/mounting reference.",
-      "type": "distance",
-      "id": "staging_hcsr04_depth_raw",
-      "unit": "in",
-      "name": "HC-SR04-33 Raw Distance",
-      "intervalSeconds": 60,
-      "samplesPerReading": 5,
-      "params": {
-        "chip": "/dev/gpiochip0",
-        "trigPin": 17,
-        "echoPin": 18
-      }
-    },
-    {
       "_comment": "MB7389-100 powered at 3.3 V with pin 5 TTL serial wired directly to BCM GPIO5/UART2 RX, exposed as /dev/ttyAMA2. Pin 4 remains open for continuous ranging; no inverter, divider, or triggerPin. Provisional zero adopted 2026-11-04 by user instruction: current target assumed zero water; raw UART sample 2167-2171 mm, typical 2170 mm. totalLength=2170/25.4 inches replaces 48 inches. Not a surveyed mounting reference; verify when physical zero is measured. Historical data unchanged.",
       "type": "maxbotix",
       "id": "staging_maxbotix_depth",

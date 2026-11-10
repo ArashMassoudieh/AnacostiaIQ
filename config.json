@@ -72,20 +72,6 @@
       }
     },
     {
-      "_comment": "Diagnostic twin of lab_hcsr04_depth, publishing the raw measured distance (no totalLength, so no depth conversion applied). Lets the sensor's raw reading be checked directly, independent of the configured standpipe/mounting reference.",
-      "type": "distance",
-      "id": "lab_hcsr04_depth_raw",
-      "unit": "in",
-      "name": "Lab RCWL-9610A Raw Distance",
-      "intervalSeconds": 60,
-      "samplesPerReading": 5,
-      "params": {
-        "chip": "/dev/gpiochip0",
-        "trigPin": 17,
-        "echoPin": 18
-      }
-    },
-    {
       "_comment": "LAB PI ONLY: soil-moisture probe analog output is wired to ADS1115 A0. Initial calibration from bench test on 2026-09-17: dry air ~17155 raw; wet endpoint ~6400 raw. MoistureSensorI2C maps dry to 0% and wet to 100% and clamps outside that range. Published with lab-specific ID lab_moisture_a0 so cloud data cannot mix with the field station.",
       "id": "lab_moisture_a0",
       "type": "moisture_ads1115",
