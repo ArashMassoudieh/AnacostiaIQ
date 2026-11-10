@@ -1,0 +1,155 @@
+{
+  "_comment": "Inactive Station Standard v1 staging profile for jm-cua-twin-pi. Do not use as the production field identity until the physical cutover. Wiring follows the Dropbox Station Standard v1 guide: HC-SR04-33 on GPIO17/18, MB7389 direct TTL on UART2/GPIO5, ADS1115 at 0x48 with moisture A0-A2 and SEN0262 pressure-loop current on A3.",
+  "project": "John-McCormack",
+  "station": {
+    "id": "jm_cua_twin_pi_staging",
+    "name": "JM CUA Twin Pi (Station Standard v1 Bench)"
+  },
+  "app": {
+    "pollIntervalSeconds": 10,
+    "barrelDepthCm": 137.16,
+    "apiUrl": "http://54.213.147.59:5000/sensor"
+  },
+  "health": {
+    "_comment": "Operational health thresholds. Defaults preserve the original behavior; edit these values without recompiling the service.",
+    "thresholds": {
+      "sensorDegradedFailures": 2,
+      "sensorStaleMinimumSeconds": 60,
+      "sensorStalePollFactor": 3,
+      "moistureDegradedBoundaryReadings": 1,
+      "moistureOfflineBoundaryReadings": 3,
+      "cloudDegradedFailures": 1,
+      "cloudOfflineFailures": 3,
+      "queueDegraded": 500,
+      "queueCritical": 2000,
+      "diskDegradedMb": 500,
+      "diskCriticalMb": 100,
+      "cpuDegradedC": 70,
+      "cpuCriticalC": 80
+    }
+  },
+  "adaptive": {
+    "_comment": "Disabled 2026-11-04 for fixed one-minute sensor cadence. Previous adaptive settings are retained for a future deliberate re-enable.",
+    "enabled": false,
+    "idleFactor": 10,
+    "rainProbabilityThreshold": 0,
+    "lookaheadHours": 24
+  },
+  "weather": {
+    "_comment": "source is 'openmeteo' or 'noaa'. Open-Meteo uses latitude/longitude and gives hourly values. NOAA uses noaaOffice + gridX/gridY (multi-hour bins). 'intervalSeconds' polls weather as a group; forecasts change slowly so a larger value is fine.",
+    "intervalSeconds": 1800,
+    "source": "openmeteo",
+    "latitude": 38.98,
+    "longitude": -77.1,
+    "noaaOffice": "LWX",
+    "noaaGridX": 97,
+    "noaaGridY": 71
+  },
+  "ads1115": {
+    "_comment": "LAB PI ONLY: ADS1115 soil-moisture ADC on I2C bus 1. GPIO2/GPIO3 remain SDA1/SCL1; unlike the retired ADC0804 lab path this block does not claim GPIO2 as a general-purpose output. Initial calibration measured 2026-09-17: dry air about 17155 raw (2.144 V), wet endpoint about 6400 raw (0.800 V). Recalibrate adcWet in representative soil for quantitative use.",
+    "device": "/dev/i2c-1",
+    "address": "0x48",
+    "fsVoltage": 4.096,
+    "dataRateSps": 128,
+    "cacheMs": 200
+  },
+  "sensors": [
+    {
+      "_comment": "HC-SR04-33 direct 3.3 V wiring: TRIG BCM GPIO17, ECHO BCM GPIO18. totalLength 48 in is provisional; replace with the surveyed sensor-to-reference distance after mounting.",
+      "type": "distance",
+      "id": "staging_hcsr04_depth",
+      "unit": "in",
+      "name": "HC-SR04-33 Depth",
+      "intervalSeconds": 60,
+      "samplesPerReading": 5,
+      "params": {
+        "chip": "/dev/gpiochip0",
+        "trigPin": 17,
+        "echoPin": 18,
+        "totalLength": 48.0
+      }
+    },
+    {
+      "_comment": "MB7389-100 powered at 3.3 V with pin 5 TTL serial wired directly to BCM GPIO5/UART2 RX, exposed as /dev/ttyAMA2. Pin 4 remains open for continuous ranging; no inverter, divider, or triggerPin. Provisional zero adopted 2026-11-04 by user instruction: current target assumed zero water; raw UART sample 2167-2171 mm, typical 2170 mm. totalLength=2170/25.4 inches replaces 48 inches. Not a surveyed mounting reference; verify when physical zero is measured. Historical data unchanged.",
+      "type": "maxbotix",
+      "id": "staging_maxbotix_depth",
+      "unit": "in",
+      "name": "MaxBotix Ponding Depth",
+      "intervalSeconds": 60,
+      "samplesPerReading": 5,
+      "params": {
+        "device": "/dev/ttyAMA2",
+        "totalLength": 85.43307086614173,
+        "chip": "/dev/gpiochip0"
+      }
+    },
+    {
+      "_comment": "PROVISIONAL field baseline adopted 2026-11-03 by user request: lab A0 bench references measured 2026-09-17, dry air 17155 raw (~2.144 V), wet endpoint originally 6400 raw (~0.800 V). UPDATED 2026-11-10: this probe's own raw readings ran as low as 5720 over several days of operation, well past the borrowed 6400 wet endpoint, so every reading was clamping to 100%. adcWet lowered to 5600 (observed floor minus a small margin) so real variation shows again. This is still not a true wet/water calibration point for this specific probe -- replace with one (submerge the probe, record raw) before treating this as quantitative.",
+      "type": "moisture_ads1115",
+      "id": "staging_moisture_sensor",
+      "unit": "%",
+      "name": "Soil Moisture 1",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 0,
+        "adcDry": 17155,
+        "adcWet": 5600
+      }
+    },
+    {
+      "_comment": "PROVISIONAL field baseline adopted 2026-11-03 by user request: lab A0 bench references measured 2026-09-17, dry air 17155 raw (~2.144 V), wet endpoint originally 6400 raw (~0.800 V). UPDATED 2026-11-10: this probe's own raw readings ran as low as 2515 over several days of operation, far past the borrowed 6400 wet endpoint, so every reading was clamping to 100%. adcWet lowered to 2400 (observed floor minus a small margin) so real variation shows again. This is still not a true wet/water calibration point for this specific probe -- replace with one (submerge the probe, record raw) before treating this as quantitative.",
+      "type": "moisture_ads1115",
+      "id": "staging_moisture_a1",
+      "unit": "%",
+      "name": "Soil Moisture 2",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 1,
+        "adcDry": 17155,
+        "adcWet": 2400
+      }
+    },
+    {
+      "_comment": "PROVISIONAL field baseline adopted 2026-11-03 by user request: lab A0 bench references measured 2026-09-17, dry air 17155 raw (~2.144 V), wet endpoint 6400 raw (~0.800 V). Shared reference only; not individual field-probe or soil-specific calibration. Verify each installed probe with its full cable before quantitative use. A2 intermittent jumps remain unresolved.",
+      "type": "moisture_ads1115",
+      "id": "staging_moisture_a2",
+      "unit": "%",
+      "name": "Soil Moisture 3",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 2,
+        "adcDry": 17155,
+        "adcWet": 6400
+      }
+    },
+    {
+      "_comment": "Raw current from the 4-20 mA pressure transmitter through DFRobot SEN0262 on ADS1115 A3. No depth calibration is applied; add a separate calibrated depth entry only after a field multi-point calibration.",
+      "type": "current_loop_ads1115",
+      "id": "staging_pressure_loop_current_raw",
+      "unit": "mA",
+      "name": "Pressure Transmitter Loop Current (raw)",
+      "intervalSeconds": 60,
+      "samplesPerReading": 3,
+      "params": {
+        "circuit": {
+          "channel": 3,
+          "shuntOhms": 120.0,
+          "validMinMa": 3.5,
+          "validMaxMa": 21.5
+        }
+      }
+    }
+  ],
+  "_cutoverChecklist": [
+    "Keep this staging station id and staging_ sensor ids during bench tests.",
+    "Confirm i2cdetect shows ADS1115 at 0x48 after wiring.",
+    "Collect and store moisture calibration for A0-A2.",
+    "Collect at least five pressure/depth calibration points across the intended range.",
+    "Measure HC and MaxBotix reference distances after mounting, including the MaxBotix standpipe connection.",
+    "Only at physical cutover change station.id to field_station_01 and remove staging_ from production sensor ids.",
+    "Do not stop the current field Pi until this profile passes an end-to-end cloud and sensor check."
+  ]
+}
