@@ -8,12 +8,13 @@
 MoistureSensor::MoistureSensor(const QString &id, const QString &unit,
                                const QString &name,
                                std::shared_ptr<AdcBus> bus, int dataPin,
-                               int adcDry, int adcWet, bool rejectAdcRails)
+                               int adcDry, int adcWet, bool rejectAdcRails,
+                               bool rawOnly)
     : Sensor(id, unit, name),
       m_bus(std::move(bus)), m_dataPin(dataPin),
       m_adcDry(adcDry), m_adcWet(adcWet),
-      m_rejectAdcRails(rejectAdcRails) {
-    setFullScale(100.0);
+      m_rejectAdcRails(rejectAdcRails), m_rawOnly(rawOnly) {
+    setFullScale(rawOnly ? 5.0 : 100.0);   // ADC0804 reference is 5V
 }
 
 MoistureSensor::~MoistureSensor() = default;
@@ -30,7 +31,8 @@ bool MoistureSensor::initialize() {
         setAvailable(false);
         return false;
     }
-    if (m_adcDry <= m_adcWet) {
+    // Not applicable in raw mode: there is no dry/wet calibration to validate.
+    if (!m_rawOnly && m_adcDry <= m_adcWet) {
         qWarning() << "MoistureSensor" << id() << ": adcDry" << m_adcDry
                    << "must be greater than adcWet" << m_adcWet;
         setAvailable(false);
@@ -70,7 +72,14 @@ double MoistureSensor::measure() {
         return -1;
     }
 
-    const double voltage  = (raw * 5.0) / 255.0;
+    const double voltage = (raw * 5.0) / 255.0;
+
+    if (m_rawOnly) {
+        qDebug() << "MoistureSensor" << id() << ": ADC =" << raw
+                 << "voltage =" << voltage << "V";
+        return voltage;
+    }
+
     const double moisture = rawToMoisturePercent(raw);
 
     qDebug() << "MoistureSensor" << id() << ": ADC =" << raw

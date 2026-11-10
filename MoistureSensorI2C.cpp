@@ -7,11 +7,16 @@
 MoistureSensorI2C::MoistureSensorI2C(const QString &id, const QString &unit,
                                      const QString &name,
                                      std::shared_ptr<Ads1115Bus> bus,
-                                     int channel, int adcDry, int adcWet)
+                                     int channel, int adcDry, int adcWet,
+                                     bool rawOnly)
     : Sensor(id, unit, name),
       m_bus(std::move(bus)), m_channel(channel),
-      m_adcDry(adcDry), m_adcWet(adcWet) {
-    setFullScale(100.0);   // moisture is reported as 0-100 %
+      m_adcDry(adcDry), m_adcWet(adcWet), m_rawOnly(rawOnly) {
+    if (!rawOnly)
+        setFullScale(100.0);   // moisture is reported as 0-100 %
+    // rawOnly leaves fullScale at its Sensor default: the bus's fsVoltage
+    // isn't exposed here, and nothing in this codebase reads fullScale
+    // for anything load-bearing, so guessing a value isn't worth doing.
 }
 
 MoistureSensorI2C::~MoistureSensorI2C() = default;
@@ -32,7 +37,8 @@ bool MoistureSensorI2C::initialize() {
     }
     // A calibration that isn't dry-above-wet would invert or divide by
     // zero in rawToMoisturePercent() — same guard as MoistureSensor.
-    if (m_adcDry <= m_adcWet) {
+    // Not applicable in raw mode: there is no dry/wet calibration to validate.
+    if (!m_rawOnly && m_adcDry <= m_adcWet) {
         qWarning() << "MoistureSensorI2C" << id() << ": adcDry" << m_adcDry
                    << "must be greater than adcWet" << m_adcWet;
         setAvailable(false);
@@ -57,6 +63,13 @@ double MoistureSensorI2C::measure() {
     const int raw = m_bus->read(m_channel);
     if (raw < 0)
         return -1;            // honest gap rather than a fake reading
+
+    if (m_rawOnly) {
+        const double volts = m_bus->rawToVoltage(raw);
+        qDebug() << "MoistureSensorI2C" << id() << ": raw =" << raw
+                 << "voltage =" << volts << "V";
+        return volts;
+    }
 
     const double moisture = rawToMoisturePercent(raw);
 

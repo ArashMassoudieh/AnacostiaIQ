@@ -22,10 +22,11 @@ using namespace std::chrono;
 
 DistanceSensor::DistanceSensor(const QString &id, const QString &unit,
                                const QString &name, int trigPin, int echoPin,
-                               double totalLength, const QString &chip)
+                               double totalLength, const QString &chip,
+                               bool rawOnly)
     : Sensor(id, unit, name),
       m_trigPin(trigPin), m_echoPin(echoPin),
-      m_totalLength(totalLength), m_chipPath(chip) {
+      m_totalLength(totalLength), m_chipPath(chip), m_rawOnly(rawOnly) {
     setFullScale(totalLength);
 }
 
@@ -147,6 +148,13 @@ double DistanceSensor::measure() {
 
         // Convert to configured unit, then to depth
         double measured = inchesToUnit(measuredInches);
+
+        if (m_rawOnly) {
+            qDebug() << "DistanceSensor" << id()
+                     << ": raw measured distance =" << measured << unit();
+            return measured;
+        }
+
         double depth = m_totalLength - measured;
         if (depth < 0)
             depth = 0;

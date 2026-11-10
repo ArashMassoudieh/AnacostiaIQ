@@ -203,31 +203,40 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
         if (type == "distance") {
             int trigPin = params.value("trigPin").toInt(-1);
             int echoPin = params.value("echoPin").toInt(-1);
+            // Omitting totalLength means this entry reports the raw
+            // measured distance instead of a depth -- see DistanceSensor.h.
+            const bool rawOnly = !params.contains("totalLength");
             double totalLength = params.value("totalLength").toDouble(0.0);
             QString chip = params.value("chip").toString("/dev/gpiochip0");
             sensor = new DistanceSensor(id, unit, name, trigPin, echoPin,
-                                        totalLength, chip);
+                                        totalLength, chip, rawOnly);
         }
         else if (type == "moisture") {
             // Pins/timing for the bus itself live in the "adc" block;
             // a moisture entry only names its channel and calibration.
+            // Omitting adcDry/adcWet means this entry reports raw voltage
+            // instead of a dry/wet percent -- see MoistureSensor.h.
             int dataPin = params.value("dataPin").toInt(-1);
+            const bool rawOnly = !(params.contains("adcDry") && params.contains("adcWet"));
             int adcDry  = params.value("adcDry").toInt(105);
             int adcWet  = params.value("adcWet").toInt(32);
 
             sensor = new MoistureSensor(id, unit, name, adcBus, dataPin,
-                                        adcDry, adcWet);
+                                        adcDry, adcWet, true, rawOnly);
         }
         else if (type == "moisture_ads1115") {
             // Bus-level settings (device, address, gain, data rate) live
             // in the "ads1115" block; an entry only names its channel
             // and calibration — mirrors the "moisture"/"adc" split.
+            // Omitting adcDry/adcWet means this entry reports raw voltage
+            // instead of a dry/wet percent -- see MoistureSensorI2C.h.
             int channel = params.value("channel").toInt(-1);
+            const bool rawOnly = !(params.contains("adcDry") && params.contains("adcWet"));
             int adcDry  = params.value("adcDry").toInt(-1);
             int adcWet  = params.value("adcWet").toInt(-1);
 
             sensor = new MoistureSensorI2C(id, unit, name, ads1115Bus,
-                                           channel, adcDry, adcWet);
+                                           channel, adcDry, adcWet, rawOnly);
         }
         else if (type == "current_loop_ads1115") {
             // "circuit" is the fixed measurement hardware (shunt, channel,
@@ -276,6 +285,9 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
         }
         else if (type == "maxbotix") {
             QString device     = params.value("device").toString("/dev/serial0");
+            // Omitting totalLength means this entry reports the raw
+            // measured distance instead of a depth -- see MaxbotixSensor.h.
+            const bool rawOnly = !params.contains("totalLength");
             double  totalLength = params.value("totalLength").toDouble(0.0);
             // triggerPin: RX/control GPIO the sensor needs pulsed before
             // each reading. -1 (default) skips triggering for any unit
@@ -283,7 +295,7 @@ QVector<Sensor*> Config::createSensors(QObject *parent) const
             int     triggerPin = params.value("triggerPin").toInt(-1);
             QString chip       = params.value("chip").toString("/dev/gpiochip0");
             sensor = new MaxbotixSensor(id, unit, name, device, totalLength,
-                                        triggerPin, chip);
+                                        triggerPin, chip, rawOnly);
         }
         else {
             qWarning() << "Config: unknown sensor type" << type

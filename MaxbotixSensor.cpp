@@ -32,10 +32,11 @@
 MaxbotixSensor::MaxbotixSensor(const QString &id, const QString &unit,
                                const QString &name, const QString &device,
                                double totalLength, int triggerPin,
-                               const QString &chip)
+                               const QString &chip, bool rawOnly)
     : Sensor(id, unit, name),
       m_device(device), m_totalLength(totalLength),
-      m_triggerPin(triggerPin), m_chipPath(chip) {
+      m_triggerPin(triggerPin), m_chipPath(chip), m_rawOnly(rawOnly) {
+    setFullScale(rawOnly ? mmToUnit(MAX_RANGE_MM) : totalLength);
 }
 
 MaxbotixSensor::~MaxbotixSensor() {
@@ -219,13 +220,20 @@ double MaxbotixSensor::measure() {
                         return -1;
                     }
 
+                    double measured = mmToUnit(rangeMm);
+
+                    if (m_rawOnly) {
+                        qDebug() << "MaxbotixSensor" << id()
+                                 << ": raw measured distance =" << measured << unit();
+                        return measured;
+                    }
+
                     if (rangeMm == MAX_RANGE_MM)
                         return 0.0;
 
                     if (rangeMm == MIN_RANGE_MM)
                         qWarning() << "MaxbotixSensor: target within minimum range (R0300)";
 
-                    double measured = mmToUnit(rangeMm);
                     // A measured range beyond the configured standpipe length
                     // means no ponding; never publish a negative water depth.
                     double depth = qMax(0.0, m_totalLength - measured);

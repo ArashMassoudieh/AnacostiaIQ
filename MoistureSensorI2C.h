@@ -8,6 +8,11 @@
 //  range is the ADS1115's signed 16-bit conversion result instead of
 //  ADC0804's 0-255 byte — the old adcDry/adcWet values do NOT carry
 //  over and must be recalibrated for this bus.
+//
+//  rawOnly (set when config omits adcDry/adcWet) skips the dry/wet
+//  conversion and reports the channel's raw voltage instead — mirrors
+//  CurrentLoopSensorI2C reporting raw mA when its calibration block is
+//  absent.
 /////////////////////////////////////////////////////////////
 
 #ifndef MOISTURESENSORI2C_H
@@ -22,7 +27,8 @@ class MoistureSensorI2C : public Sensor {
 public:
     MoistureSensorI2C(const QString &id, const QString &unit,
                       const QString &name, std::shared_ptr<Ads1115Bus> bus,
-                      int channel, int adcDry, int adcWet);
+                      int channel, int adcDry, int adcWet,
+                      bool rawOnly = false);
     ~MoistureSensorI2C() override;
 
     bool   initialize() override;
@@ -40,6 +46,7 @@ private:
     // ADC0804-scale ones.
     int m_adcDry;
     int m_adcWet;
+    bool m_rawOnly;   // report raw voltage, not dry/wet moisture percent
 };
 
 #endif // MOISTURESENSORI2C_H

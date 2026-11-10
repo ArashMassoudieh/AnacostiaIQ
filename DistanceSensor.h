@@ -5,6 +5,10 @@
 //  Reports water DEPTH directly: depth = totalLength − measured,
 //  both in the configured unit ("mm", "cm", or "in"). Pins are
 //  BCM (GPIO) line offsets, supplied from config.
+//
+//  rawOnly (set when config omits totalLength) skips the depth
+//  conversion and reports the measured distance itself instead,
+//  still unit-converted.
 /////////////////////////////////////////////////////////////
 
 #ifndef DISTANCESENSOR_H
@@ -29,7 +33,8 @@ public:
     // chip        — gpiochip device path, e.g. "/dev/gpiochip0"
     DistanceSensor(const QString &id, const QString &unit,
                    const QString &name, int trigPin, int echoPin,
-                   double totalLength, const QString &chip);
+                   double totalLength, const QString &chip,
+                   bool rawOnly = false);
     ~DistanceSensor() override;
 
     bool   initialize() override;   // Request GPIO lines; false if unavailable
@@ -45,6 +50,7 @@ private:
     int     m_echoPin;
     double  m_totalLength;   // in configured unit
     QString m_chipPath;
+    bool    m_rawOnly;       // report measured distance, not totalLength − measured
 
 #ifdef RasPi
     std::unique_ptr<gpiod::chip>         m_chip;

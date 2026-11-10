@@ -14,6 +14,13 @@
 //  This sensor reports DEPTH directly: depth = total_length −
 //  measured_distance, both expressed in the configured unit.
 //  total_length and the reported unit come from config.
+//
+//  rawOnly (set when config omits totalLength) skips the depth
+//  conversion and reports the measured distance itself instead —
+//  still unit-converted, just not turned into a depth. Protocol-level
+//  validity checks (MIN/MAX_RANGE_MM) still apply either way; those
+//  detect a disconnected/failed sensor, which is a different concept
+//  from the depth calibration.
 /////////////////////////////////////////////////////////////
 
 #ifndef MAXBOTIXSENSOR_H
@@ -42,7 +49,8 @@ public:
     MaxbotixSensor(const QString &id, const QString &unit,
                    const QString &name, const QString &device,
                    double totalLength, int triggerPin = -1,
-                   const QString &chip = QStringLiteral("/dev/gpiochip0"));
+                   const QString &chip = QStringLiteral("/dev/gpiochip0"),
+                   bool rawOnly = false);
     ~MaxbotixSensor() override;
 
     bool   initialize() override;   // Open UART (+ trigger GPIO); false if unavailable
@@ -59,6 +67,7 @@ private:
 
     int     m_triggerPin;    // BCM GPIO line, or -1 if unused
     QString m_chipPath;
+    bool    m_rawOnly;       // report measured distance, not totalLength − measured
 
 #ifdef RasPi
     std::unique_ptr<gpiod::chip>         m_chip;

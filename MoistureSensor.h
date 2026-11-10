@@ -1,5 +1,10 @@
 /////////////////////////////////////////////////////////////
 // MOISTURESENSOR.H - Soil moisture sensor (one ADC0804 channel)
+//
+//  rawOnly (set when config omits adcDry/adcWet) skips the dry/wet
+//  conversion and reports the channel's raw voltage instead. The
+//  ADC-rail rejection below still applies either way — that detects
+//  a disconnected probe/converter, not a calibration problem.
 /////////////////////////////////////////////////////////////
 
 #ifndef MOISTURESENSOR_H
@@ -15,7 +20,8 @@ class MoistureSensor : public Sensor {
 public:
     MoistureSensor(const QString &id, const QString &unit, const QString &name,
                    std::shared_ptr<AdcBus> bus, int dataPin,
-                   int adcDry, int adcWet, bool rejectAdcRails = true);
+                   int adcDry, int adcWet, bool rejectAdcRails = true,
+                   bool rawOnly = false);
     ~MoistureSensor() override;
 
     bool   initialize() override;
@@ -36,6 +42,7 @@ private:
     // configurable because a future installation may intentionally use
     // the full ADC rail as part of a calibrated measurement range.
     bool m_rejectAdcRails = true;
+    bool m_rawOnly = false;   // report raw voltage, not dry/wet moisture percent
 };
 
 #endif // MOISTURESENSOR_H

@@ -70,6 +70,20 @@
       }
     },
     {
+      "_comment": "Diagnostic twin of staging_hcsr04_depth, publishing the raw measured distance (no totalLength, so no depth conversion applied). Lets the sensor's raw reading be checked directly, independent of the configured standpipe/mounting reference.",
+      "type": "distance",
+      "id": "staging_hcsr04_depth_raw",
+      "unit": "in",
+      "name": "HC-SR04-33 Raw Distance",
+      "intervalSeconds": 60,
+      "samplesPerReading": 5,
+      "params": {
+        "chip": "/dev/gpiochip0",
+        "trigPin": 17,
+        "echoPin": 18
+      }
+    },
+    {
       "_comment": "MB7389-100 powered at 3.3 V with pin 5 TTL serial wired directly to BCM GPIO5/UART2 RX, exposed as /dev/ttyAMA2. Pin 4 remains open for continuous ranging; no inverter, divider, or triggerPin. Provisional zero adopted 2026-11-04 by user instruction: current target assumed zero water; raw UART sample 2167-2171 mm, typical 2170 mm. totalLength=2170/25.4 inches replaces 48 inches. Not a surveyed mounting reference; verify when physical zero is measured. Historical data unchanged.",
       "type": "maxbotix",
       "id": "staging_maxbotix_depth",
@@ -80,6 +94,19 @@
       "params": {
         "device": "/dev/ttyAMA2",
         "totalLength": 85.43307086614173,
+        "chip": "/dev/gpiochip0"
+      }
+    },
+    {
+      "_comment": "Diagnostic twin of staging_maxbotix_depth, publishing the raw measured distance (no totalLength, so no depth conversion applied).",
+      "type": "maxbotix",
+      "id": "staging_maxbotix_depth_raw",
+      "unit": "in",
+      "name": "MaxBotix Raw Distance",
+      "intervalSeconds": 60,
+      "samplesPerReading": 5,
+      "params": {
+        "device": "/dev/ttyAMA2",
         "chip": "/dev/gpiochip0"
       }
     },
@@ -98,6 +125,18 @@
       }
     },
     {
+      "_comment": "Diagnostic twin of staging_moisture_sensor, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
+      "type": "moisture_ads1115",
+      "id": "staging_moisture_sensor_raw",
+      "unit": "V",
+      "name": "Soil Moisture 1 Raw Voltage",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 0
+      }
+    },
+    {
       "_comment": "PROVISIONAL field baseline adopted 2026-11-03 by user request: lab A0 bench references measured 2026-09-17, dry air 17155 raw (~2.144 V), wet endpoint originally 6400 raw (~0.800 V). UPDATED 2026-11-10: this probe's own raw readings ran as low as 2515 over several days of operation, far past the borrowed 6400 wet endpoint, so every reading was clamping to 100%. adcWet lowered to 2400 (observed floor minus a small margin) so real variation shows again. This is still not a true wet/water calibration point for this specific probe -- replace with one (submerge the probe, record raw) before treating this as quantitative.",
       "type": "moisture_ads1115",
       "id": "staging_moisture_a1",
@@ -112,6 +151,18 @@
       }
     },
     {
+      "_comment": "Diagnostic twin of staging_moisture_a1, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
+      "type": "moisture_ads1115",
+      "id": "staging_moisture_a1_raw",
+      "unit": "V",
+      "name": "Soil Moisture 2 Raw Voltage",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 1
+      }
+    },
+    {
       "_comment": "PROVISIONAL field baseline adopted 2026-11-03 by user request: lab A0 bench references measured 2026-09-17, dry air 17155 raw (~2.144 V), wet endpoint 6400 raw (~0.800 V). Shared reference only; not individual field-probe or soil-specific calibration. Verify each installed probe with its full cable before quantitative use. A2 intermittent jumps remain unresolved.",
       "type": "moisture_ads1115",
       "id": "staging_moisture_a2",
@@ -123,6 +174,18 @@
         "channel": 2,
         "adcDry": 17155,
         "adcWet": 6400
+      }
+    },
+    {
+      "_comment": "Diagnostic twin of staging_moisture_a2, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
+      "type": "moisture_ads1115",
+      "id": "staging_moisture_a2_raw",
+      "unit": "V",
+      "name": "Soil Moisture 3 Raw Voltage",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 2
       }
     },
     {
