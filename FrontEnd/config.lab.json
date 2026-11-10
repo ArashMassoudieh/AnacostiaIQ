@@ -4,36 +4,81 @@
   "_projectComment": "Must match the project in the lab Pi config.json so API queries use the same data namespace.",
   "project": "John-McCormack",
   "health_application_stale_seconds": 600,
-  "window_title": "AnacostiaIQ — CUA Lab Dashboard",
+  "window_title": "AnacostiaIQ \u2014 CUA Lab Dashboard",
   "camera": {
     "enabled": true,
     "station_id": "lab_station_01",
-    "title": "CUA Lab Camera — Arducam B0647"
+    "title": "CUA Lab Camera \u2014 Arducam B0647"
   },
   "health_stations": [
     {
       "id": "lab_station_01",
       "name": "CUA Lab Station",
-      "location": "Catholic University · Washington, DC",
+      "location": "Catholic University \u00b7 Washington, DC",
       "visible": true
     }
   ],
   "health_components": [
-    {"id": "sensor_lab_hcsr04_depth", "name": "RCWL-9610A Ultrasonic Head"},
-    {"id": "sensor_lab_maxbotix_depth_1", "name": "Original MB7389"},
-    {"id": "sensor_lab_maxbotix_depth_2", "name": "New MB7389 B7604"},
-    {"id": "sensor_lab_moisture_a0", "name": "Soil Moisture A0"},
-    {"id": "sensor_lab_moisture_a1", "name": "Soil Moisture A1"},
-    {"id": "sensor_lab_moisture_a2", "name": "Soil Moisture A2"},
-    {"id": "sensor_lab_pressure_loop_current", "name": "Water-Level Transmitter Depth"},
-    {"id": "sensor_lab_barometer_pressure", "name": "Atmospheric Pressure"},
-    {"id": "sensor_lab_barometer_temperature", "name": "Barometer Temperature"},
-    {"id": "application", "name": "Application"},
-    {"id": "cloud", "name": "Cloud / API"},
-    {"id": "upload_queue", "name": "Upload Queue"},
-    {"id": "storage", "name": "Storage"},
-    {"id": "cpu_temperature", "name": "CPU Temperature"},
-    {"id": "overall", "name": "Overall Station"}
+    {
+      "id": "sensor_lab_hcsr04_depth",
+      "name": "RCWL-9610A Ultrasonic Head"
+    },
+    {
+      "id": "sensor_lab_maxbotix_depth_1",
+      "name": "Original MB7389"
+    },
+    {
+      "id": "sensor_lab_maxbotix_depth_2",
+      "name": "New MB7389 B7604"
+    },
+    {
+      "id": "sensor_lab_moisture_a0",
+      "name": "Soil Moisture A0"
+    },
+    {
+      "id": "sensor_lab_moisture_a1",
+      "name": "Soil Moisture A1"
+    },
+    {
+      "id": "sensor_lab_moisture_a2",
+      "name": "Soil Moisture A2"
+    },
+    {
+      "id": "sensor_lab_pressure_loop_current",
+      "name": "Water-Level Transmitter Depth"
+    },
+    {
+      "id": "sensor_lab_barometer_pressure",
+      "name": "Atmospheric Pressure"
+    },
+    {
+      "id": "sensor_lab_barometer_temperature",
+      "name": "Barometer Temperature"
+    },
+    {
+      "id": "application",
+      "name": "Application"
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud / API"
+    },
+    {
+      "id": "upload_queue",
+      "name": "Upload Queue"
+    },
+    {
+      "id": "storage",
+      "name": "Storage"
+    },
+    {
+      "id": "cpu_temperature",
+      "name": "CPU Temperature"
+    },
+    {
+      "id": "overall",
+      "name": "Overall Station"
+    }
   ],
   "refresh_interval_sec": 30,
   "auto_refresh": true,
@@ -60,6 +105,16 @@
       "floor_at_zero": true
     },
     {
+      "_comment": "Raw measured distance, no totalLength/depth conversion -- diagnostic twin of lab_maxbotix_depth_1.",
+      "id": "lab_maxbotix_depth_1_raw",
+      "name": "Original Lab MB7389 (raw distance)",
+      "unit": "in",
+      "color": "#bdbdbd",
+      "area_color": "#28bdbdbd",
+      "floor_at_zero": false,
+      "visible": false
+    },
+    {
       "id": "lab_maxbotix_depth_2",
       "name": "New Lab MB7389 B7604",
       "unit": "in",
@@ -68,12 +123,32 @@
       "floor_at_zero": true
     },
     {
+      "_comment": "Raw measured distance, no totalLength/depth conversion -- diagnostic twin of lab_maxbotix_depth_2.",
+      "id": "lab_maxbotix_depth_2_raw",
+      "name": "New Lab MB7389 B7604 (raw distance)",
+      "unit": "in",
+      "color": "#bdbdbd",
+      "area_color": "#28bdbdbd",
+      "floor_at_zero": false,
+      "visible": false
+    },
+    {
       "id": "lab_moisture_a0",
       "name": "Lab Soil Moisture A0",
       "unit": "%",
       "color": "#8d6e63",
       "area_color": "#2d8d6e63",
       "floor_at_zero": true
+    },
+    {
+      "_comment": "Raw channel voltage, no dry/wet calibration applied -- diagnostic twin of lab_moisture_a0.",
+      "id": "lab_moisture_a0_raw",
+      "name": "Lab Soil Moisture A0 (raw voltage)",
+      "unit": "V",
+      "color": "#bdbdbd",
+      "area_color": "#28bdbdbd",
+      "floor_at_zero": false,
+      "visible": false
     },
     {
       "_comment": "Active with provisional 23000/6400 calibration; replace with this probe's measured endpoints before quantitative use.",
@@ -86,6 +161,16 @@
       "visible": true
     },
     {
+      "_comment": "Raw channel voltage, no dry/wet calibration applied -- diagnostic twin of lab_moisture_a1.",
+      "id": "lab_moisture_a1_raw",
+      "name": "Lab Soil Moisture A1 (raw voltage)",
+      "unit": "V",
+      "color": "#bdbdbd",
+      "area_color": "#28bdbdbd",
+      "floor_at_zero": false,
+      "visible": false
+    },
+    {
       "_comment": "Active with provisional 23000/6400 calibration; replace with this probe's measured endpoints before quantitative use.",
       "id": "lab_moisture_a2",
       "name": "Lab Soil Moisture A2",
@@ -94,6 +179,16 @@
       "area_color": "#28ffa726",
       "floor_at_zero": true,
       "visible": true
+    },
+    {
+      "_comment": "Raw channel voltage, no dry/wet calibration applied -- diagnostic twin of lab_moisture_a2.",
+      "id": "lab_moisture_a2_raw",
+      "name": "Lab Soil Moisture A2 (raw voltage)",
+      "unit": "V",
+      "color": "#bdbdbd",
+      "area_color": "#28bdbdbd",
+      "floor_at_zero": false,
+      "visible": false
     },
     {
       "_comment": "Provisional 2-point calibration (0 in / 3.90 mA bench zero, 2.7 in / 4.852 mA bench glass) -- see config.json for details. Needs a deeper second calibration point before trusting readings beyond 2.7 in.",
