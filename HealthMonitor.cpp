@@ -128,8 +128,14 @@ void HealthMonitor::evaluate()
         // endpoints can clamp an otherwise valid signal. The wet limit is
         // informational (normal during rain); keep a dry-limit calibration
         // warning without hiding acquisition errors.
+        //
+        // Gated on unit() == "%" rather than the sensor id containing
+        // "moisture": a raw/diagnostic twin (e.g. "..._moisture_..._raw")
+        // reports volts, not a 0-100 dry/wet percent, so the 0.01/99.99
+        // boundary this check assumes doesn't apply to it even though its
+        // id matches.
         if (level == Healthy &&
-            sensor->id().contains("moisture", Qt::CaseInsensitive) &&
+            sensor->unit() == "%" &&
             sensor->hasLastValue() &&
             (sensor->lastValue() <= 0.01 || sensor->lastValue() >= 99.99)) {
             const int rails = sensor->identicalValidReadings();
