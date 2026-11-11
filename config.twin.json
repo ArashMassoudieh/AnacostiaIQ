@@ -190,6 +190,45 @@
           "validMaxMa": 21.5
         }
       }
+    },
+    {
+      "_comment": "Calibrated depth, brought over from lab_pressure_loop_current's circuit/calibration structure as a starting point -- NOT a calibration for this probe or this well. Lab's calibration only spans 0-2.7 in (a bench glass test); this transducer is planned for the ~85 in deep inspection well, so depth values from this entry are not physically meaningful until a real multi-point field calibration is collected across the intended range (see the project's own cutover checklist). Raw current remains available as staging_pressure_loop_current_raw independent of this.",
+      "id": "staging_pressure_loop_current",
+      "type": "current_loop_ads1115",
+      "unit": "in",
+      "name": "Pressure Transmitter Depth",
+      "intervalSeconds": 60,
+      "samplesPerReading": 3,
+      "params": {
+        "circuit": {
+          "channel": 3,
+          "shuntOhms": 120.0,
+          "validMinMa": 3.5,
+          "validMaxMa": 21.5
+        },
+        "calibration": {
+          "currentMinMa": 3.9,
+          "currentMaxMa": 4.852,
+          "outputMin": 0.0,
+          "outputMax": 2.7,
+          "points": [
+            {
+              "date": "2026-10-09",
+              "reference_depth_in": 0.0,
+              "current_ma": 3.9,
+              "voltage_v": 0.468,
+              "notes": "Borrowed from lab's bench calibration (lab_pressure_loop_current), not this probe/well. Zero applied pressure, bench verification."
+            },
+            {
+              "date": "2026-10-15",
+              "reference_depth_in": 2.7,
+              "current_ma": 4.852,
+              "voltage_v": 0.582125,
+              "notes": "Borrowed from lab's bench calibration, not this probe/well. Submerged in a bench glass; depth read by eye, not precision-measured."
+            }
+          ]
+        }
+      }
     }
   ],
   "_cutoverChecklist": [
