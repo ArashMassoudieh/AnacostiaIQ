@@ -46,7 +46,7 @@
     "noaaGridY": 71
   },
   "ads1115": {
-    "_comment": "LAB PI ONLY: ADS1115 soil-moisture ADC on I2C bus 1. GPIO2/GPIO3 remain SDA1/SCL1; unlike the retired ADC0804 lab path this block does not claim GPIO2 as a general-purpose output. Initial calibration measured 2026-09-17: dry air about 17155 raw (2.144 V), wet endpoint about 6400 raw (0.800 V). Recalibrate adcWet in representative soil for quantitative use.",
+    "_comment": "ADS1115 soil-moisture and pressure-loop ADC on I2C bus 1 (this comment was copy-pasted from the lab config; fixed 2026-11-10). GPIO2/GPIO3 remain SDA1/SCL1; unlike the retired ADC0804 lab path this block does not claim GPIO2 as a general-purpose output. Initial calibration measured 2026-09-17: dry air about 17155 raw (2.144 V), wet endpoint about 6400 raw (0.800 V). Recalibrate adcWet in representative soil for quantitative use.",
     "device": "/dev/i2c-1",
     "address": "0x48",
     "fsVoltage": 4.096,
