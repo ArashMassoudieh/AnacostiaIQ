@@ -123,3 +123,5 @@ __pycache__/
 /docs/bmp390-tutorial-section.tex
 /docs/bmp390-photo-tutorial-section.tex
 /docs/figures/
+
+build/Desktop-Debug/
