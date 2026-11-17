@@ -1,0 +1,9 @@
+QT += core network testlib
+QT -= gui
+CONFIG += c++17 console testcase
+CONFIG -= app_bundle
+TEMPLATE = app
+TARGET = voltage_upload_precision_test
+INCLUDEPATH += $$PWD/..
+SOURCES += $$PWD/voltage_upload_precision_test.cpp $$PWD/../DatabaseWriter.cpp
+HEADERS += $$PWD/../DatabaseWriter.h

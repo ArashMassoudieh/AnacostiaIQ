@@ -263,7 +263,12 @@ void DatabaseWriter::sendReading(const QString &sensorId, double value,
     // queueRecordKey() stable for readings already spooled on disk.
     if (!m_project.isEmpty())
         json["project"] = m_project;
-    json["value"] = QString::number(value, 'f', 2).toDouble();
+    // Raw ADS1115 voltages need more than two decimals: at +/-4.096 V
+    // one count is 0.000125 V. Eight decimals also cover the finest PGA
+    // range. Preserve the existing representation for other telemetry so
+    // persisted queue identities and weather deduplication stay unchanged.
+    const int decimals = unit.trimmed().compare("V", Qt::CaseInsensitive) == 0 ? 8 : 2;
+    json["value"] = QString::number(value, 'f', decimals).toDouble();
     json["unit"] = unit;
 
     if (timestamp.isValid())

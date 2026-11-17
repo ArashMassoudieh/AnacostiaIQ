@@ -249,6 +249,14 @@ it, and the systemd unit passes this exact file:
 - `weather` — `openmeteo` (latitude/longitude) or `noaa` (office + grid).
 - `health.thresholds` — alarm levels, all overridable without recompiling.
 
+Raw voltage (`V`) telemetry is saved with up to eight decimal places so ADS1115
+resolution survives upload. Other units retain two decimal places. Display
+formatting is independent. Existing queued and historical records are retained
+as originally recorded; increased precision applies to newly collected voltages.
+The `_raw` moisture channels bypass dry/wet conversion, but remain voltages,
+not soil-calibrated volumetric water content. Keep calibration endpoints and
+their effective dates with each modeling dataset.
+
 ### 3.7 Install startup and recovery
 
 ```bash
