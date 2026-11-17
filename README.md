@@ -257,6 +257,12 @@ The `_raw` moisture channels bypass dry/wet conversion, but remain voltages,
 not soil-calibrated volumetric water content. Keep calibration endpoints and
 their effective dates with each modeling dataset.
 
+The lab profile now activates only the connected HC and BMP390 pressure/temperature
+sensors. Entries for the ADS moisture/pressure channels and MaxBotix units moved
+to the field are preserved under `_inactiveFieldSensors`; that archive is not
+processed by `createSensors()`. Restore an entry to `sensors[]` only when its
+hardware is connected in the lab. The field profile remains in `config.twin.json`.
+
 ### 3.7 Install startup and recovery
 
 ```bash
