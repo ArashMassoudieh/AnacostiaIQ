@@ -4,6 +4,7 @@
 
 #include "HeadlessMonitor.h"
 #include "RainPolicy.h"
+#include "DistanceSensor.h"
 
 #include <QTimer>
 #include <QDateTime>
@@ -174,6 +175,14 @@ void HeadlessMonitor::pollSensor(Sensor *s) {
     }
 
     const double value = s->takeReading();
+
+    // Keep measured range even when the derived head clips to zero. A second
+    // DistanceSensor instance cannot own the same trigger/echo GPIO lines.
+    if (auto *distance = qobject_cast<DistanceSensor *>(s)) {
+        const double range = distance->takeRawRange();
+        if (!distance->rawOnly() && std::isfinite(range))
+            dbWriter.sendReading(s->id() + "_raw", range, s->unit());
+    }
 
     if (!s->acceptsReading(value)) {
         qWarning().noquote()

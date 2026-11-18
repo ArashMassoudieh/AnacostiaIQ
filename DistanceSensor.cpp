@@ -148,6 +148,8 @@ double DistanceSensor::measure() {
 
         // Convert to configured unit, then to depth
         double measured = inchesToUnit(measuredInches);
+        m_rawSum += measured;
+        ++m_rawCount;
 
         if (m_rawOnly) {
             qDebug() << "DistanceSensor" << id()

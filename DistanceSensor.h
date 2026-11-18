@@ -41,7 +41,18 @@ public:
     void   cleanup() override;      // Release the lines
     double measure() override;      // Water depth in configured unit, or -1
 
+    // Drain the mean measured range from the latest acquisition batch.
+    // Captured before depth subtraction/clipping; does not request GPIO twice.
+    double takeRawRange() {
+        const double value = m_rawCount ? m_rawSum / m_rawCount : NAN;
+        m_rawSum = 0.0; m_rawCount = 0;
+        return value;
+    }
+    bool rawOnly() const { return m_rawOnly; }
+
 private:
+    double m_rawSum = 0.0;
+    int m_rawCount = 0;
     // Convert a raw one-way distance (inches, as computed from timing)
     // into the configured unit.
     double inchesToUnit(double inches) const;

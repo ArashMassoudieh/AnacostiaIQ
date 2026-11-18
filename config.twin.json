@@ -55,18 +55,18 @@
   },
   "sensors": [
     {
-      "_comment": "HC-SR04-33 direct 3.3 V wiring: TRIG BCM GPIO17, ECHO BCM GPIO18. totalLength 48 in is provisional; replace with the surveyed sensor-to-reference distance after mounting.",
+      "_comment": "Recovered 2026-11-18 from Sean calibration commit 669e96c (2026-08-05), retained in combined sensor program: effective sensor height 11.8125 in minus crest offset 3.3125 in = 8.5 in sensor-to-crest. Assumes original weir/mount geometry retained. New readings are head above crest; earlier readings used provisional 48 in reference and must not be mixed without correction.",
       "type": "distance",
       "id": "staging_hcsr04_depth",
       "unit": "in",
-      "name": "HC-SR04-33 Depth",
+      "name": "Inflow Weir Head",
       "intervalSeconds": 60,
       "samplesPerReading": 5,
       "params": {
         "chip": "/dev/gpiochip0",
         "trigPin": 17,
         "echoPin": 18,
-        "totalLength": 48.0
+        "totalLength": 8.5
       }
     },
     {
@@ -239,5 +239,15 @@
     "Measure HC and MaxBotix reference distances after mounting, including the MaxBotix standpipe connection.",
     "Only at physical cutover change station.id to field_station_01 and remove staging_ from production sensor ids.",
     "Do not stop the current field Pi until this profile passes an end-to-end cloud and sensor check."
-  ]
+  ],
+  "weirFlow": {
+    "_comment": "Recovered Sean V-notch calibration from 669e96c. minimumHead corresponds to the original 0.001 cfs cutoff; below it flow is withheld, not asserted zero. New series isolates this restoration from legacy flow history. Verify mounting and discharge calibration on site.",
+    "enabled": true,
+    "headSensorId": "staging_hcsr04_depth",
+    "flowSensorId": "staging_inflow_flow_rate",
+    "dischargeCoefficient": 0.25,
+    "notchAngleDegrees": 59.4,
+    "minimumHead": 0.9226348820286354,
+    "outputUnit": "L/s"
+  }
 }
