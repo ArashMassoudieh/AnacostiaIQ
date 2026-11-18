@@ -219,6 +219,11 @@ void HeadlessMonitor::publishDerivedWeirFlow(Sensor *source, double head) {
         source->id() != config.weirHeadSensorId())
         return;
 
+    // A dedicated calibrated-head series keeps old reference periods separate.
+    const QString headId = config.weirFlowConfig().value("headOutputSensorId").toString();
+    if (!headId.isEmpty())
+        dbWriter.sendReading(headId, head, source->unit());
+
     const double cd = config.weirDischargeCoefficient();
     const double angleDeg = config.weirNotchAngleDegrees();
     const double minHead = config.weirMinimumHead();

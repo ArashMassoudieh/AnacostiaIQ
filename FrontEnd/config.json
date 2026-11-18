@@ -4,7 +4,7 @@
   "_projectComment": "Must match \"project\" in the Pi-side config.json. Sent as ?project=... on every API call so this dashboard only shows one project's sensors. Leave empty or omit to view legacy (pre-project) readings.",
   "project": "John-McCormack",
   "health_application_stale_seconds": 600,
-  "window_title": "AnacostiaIQ — John McCormack Field Dashboard",
+  "window_title": "AnacostiaIQ \u2014 John McCormack Field Dashboard",
   "camera": {
     "enabled": true,
     "static_image": "field-site-overview.jpg",
@@ -15,7 +15,7 @@
     {
       "id": "jm_cua_twin_pi_staging",
       "name": "John McCormack Field Station",
-      "location": "John McCormack Rd NE · Washington, DC",
+      "location": "John McCormack Rd NE \u00b7 Washington, DC",
       "visible": true
     }
   ],
@@ -30,15 +30,19 @@
     },
     {
       "id": "sensor_staging_moisture_sensor",
-      "name": "Soil Moisture 1 · A0"
+      "name": "Soil Moisture 1 \u00b7 A0"
     },
     {
       "id": "sensor_staging_moisture_a1",
-      "name": "Soil Moisture 2 · A1"
+      "name": "Soil Moisture 2 \u00b7 A1"
     },
     {
       "id": "sensor_staging_moisture_a2",
-      "name": "Soil Moisture 3 · A2"
+      "name": "Soil Moisture 3 \u00b7 A2"
+    },
+    {
+      "id": "sensor_staging_pressure_loop_current",
+      "name": "Pressure Transducer"
     },
     {
       "id": "application",
@@ -77,13 +81,13 @@
   "_sensors_note": "Only the sensors listed here are shown, in this order. Use a plain string for defaults, or an object to override name/unit/colour/axis. Set visible:false to keep an entry on file but hide its chart. IMPORTANT: each id must match an id the Pi actually publishes (see the root config.json, and check GET /sensors on the API). A non-empty list here is treated as authoritative and suppresses sensor discovery entirely, so an id with no data behind it draws a permanently empty chart rather than being skipped.",
   "sensors": [
     {
-      "id": "staging_hcsr04_depth",
+      "id": "staging_inflow_weir_head",
       "name": "Inflow Weir Head",
       "unit": "in",
       "color": "#26c6da",
       "area_color": "#2826c6da",
-      "floor_at_zero": false,
-      "_comment": "Replacement Pi acquisition ID. Field reference distances and moisture calibration remain provisional."
+      "floor_at_zero": true,
+      "_comment": "Calibrated head above inlet weir crest, restored 2026-11-18. Separate series avoids mixing earlier 48-inch placeholder readings."
     },
     {
       "id": "staging_maxbotix_depth",
@@ -96,7 +100,7 @@
     },
     {
       "id": "staging_moisture_sensor",
-      "name": "Soil Moisture 1 · A0",
+      "name": "Soil Moisture 1 \u00b7 A0",
       "unit": "%",
       "color": "#8d6e63",
       "area_color": "#288d6e63",
@@ -105,7 +109,7 @@
     },
     {
       "id": "staging_moisture_a1",
-      "name": "Soil Moisture 2 · A1",
+      "name": "Soil Moisture 2 \u00b7 A1",
       "unit": "%",
       "color": "#66bb6a",
       "area_color": "#2866bb6a",
@@ -114,7 +118,7 @@
     },
     {
       "id": "staging_moisture_a2",
-      "name": "Soil Moisture 3 · A2",
+      "name": "Soil Moisture 3 \u00b7 A2",
       "unit": "%",
       "color": "#ffa726",
       "area_color": "#28ffa726",
@@ -123,28 +127,28 @@
     },
     {
       "id": "staging_pressure_loop_current_raw",
-      "name": "Pressure Loop Current (uncalibrated)",
+      "name": "Pressure Loop Current",
       "unit": "mA",
       "color": "#7e57c2",
       "area_color": "#287e57c2",
       "floor_at_zero": true,
-      "visible": false,
-      "_comment": "Enable only after the pressure transmitter is connected and validated; this is current, not calibrated depth."
+      "visible": true,
+      "_comment": "Measured loop current. Field pressure-to-depth calibration remains provisional."
     },
     {
-      "_comment": "Legacy derived flow is hidden until the replacement station weir geometry and derived series are configured and validated.",
-      "id": "inflow_flow_rate",
+      "_comment": "Sean calibration restored 2026-11-18; values below original 0.001 cfs measurement threshold withheld.",
+      "id": "staging_inflow_flow_rate",
       "name": "Inflow Flow Rate",
       "unit": "L/s",
       "color": "#29b6f6",
       "area_color": "#2829b6f6",
       "floor_at_zero": true,
-      "visible": false
+      "visible": true
     },
     {
       "id": "temperature",
       "name": "Temperature",
-      "unit": "°C",
+      "unit": "\u00b0C",
       "color": "#ef5350",
       "area_color": "#40ef5350",
       "floor_at_zero": false

@@ -248,6 +248,7 @@
     "dischargeCoefficient": 0.25,
     "notchAngleDegrees": 59.4,
     "minimumHead": 0.9226348820286354,
-    "outputUnit": "L/s"
+    "outputUnit": "L/s",
+    "headOutputSensorId": "staging_inflow_weir_head"
   }
 }

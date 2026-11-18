@@ -49,3 +49,23 @@ moisture A0/A1/A2 voltages (`*_raw`), and pressure loop current
 calibration, not necessarily native ADC counts or original UART frames.
 Separate moisture/pressure raw entries sample independently from their
 calibrated counterparts; do not assume exact paired acquisition timestamps.
+
+## Dashboard and recovered history
+
+The dashboard uses `staging_inflow_weir_head`, an additional calibrated-head
+output selected with `weirFlow.headOutputSensorId`. Health continues to use
+`staging_hcsr04_depth`, preserving existing sensor alarm mappings. The original
+mixed-reference series is retained for traceability but is not the displayed
+head chart. Flow uses `staging_inflow_flow_rate`. Pressure is shown as measured
+loop current (mA), since its field depth calibration is still provisional.
+
+11,352 readings from 2026-11-10 17:29 UTC through 2026-11-18 14:37:37 UTC
+were reconstructed using the documented 48-inch reference. These range
+estimates are stored separately as `staging_hcsr04_range_reconstructed`.
+Calibrated head and above-threshold flow were then calculated into the display
+series at the original timestamps. Original head and directly measured raw
+records were not overwritten. Recovered values retain source rounding and
+possible clipping/averaging limitations; they are not original raw samples.
+Earlier configuration periods were excluded because their provenance was not
+verified. Source data, reconstruction, and import scripts are archived in
+Dropbox under `04 Modeling and Analysis/JM Sensor Assimilation/2026-11-18 HC Reconstruction`.
