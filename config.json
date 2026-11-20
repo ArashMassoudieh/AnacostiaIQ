@@ -94,6 +94,151 @@
         "device": "/dev/i2c-1",
         "address": "0x77"
       }
+    },
+    {
+      "_comment": "Lab pressure transmitter retained in lab, confirmed by user 2026-11-20. DFRobot SEN0262 output on ADS1115 A3; transfer 0-25mA to 0-3V (120 ohm equivalent). Raw current only pending verification and depth calibration.",
+      "id": "lab_pressure_loop_current_raw",
+      "type": "current_loop_ads1115",
+      "unit": "mA",
+      "name": "Water-Level Transmitter Loop Current (raw)",
+      "intervalSeconds": 60,
+      "samplesPerReading": 3,
+      "params": {
+        "circuit": {
+          "channel": 3,
+          "shuntOhms": 120.0,
+          "validMinMa": 3.5,
+          "validMaxMa": 21.5
+        }
+      }
+    },
+    {
+      "_comment": "LAB PI ONLY: soil-moisture probe analog output is wired to ADS1115 A0. Initial calibration from bench test on 2026-09-17: dry air ~17155 raw; wet endpoint ~6400 raw. MoistureSensorI2C maps dry to 0% and wet to 100% and clamps outside that range. Published with lab-specific ID lab_moisture_a0 so cloud data cannot mix with the field station.",
+      "id": "lab_moisture_a0",
+      "type": "moisture_ads1115",
+      "unit": "%",
+      "name": "Soil Moisture",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 0,
+        "adcDry": 17155,
+        "adcWet": 6400
+      }
+    },
+    {
+      "_comment": "Diagnostic twin of lab_moisture_a0, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
+      "type": "moisture_ads1115",
+      "id": "lab_moisture_a0_raw",
+      "unit": "V",
+      "name": "Soil Moisture Raw Voltage",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 0
+      }
+    },
+    {
+      "_comment": "LAB PI ONLY: additional moisture probe on ADS1115 A1. Direct sampling on 2026-09-30 measured a stable 21578 raw (2.697 V). The 23000 dry and 6400 wet endpoints are provisional; replace them with this probe's measured dry and representative-wet endpoints before quantitative use.",
+      "id": "lab_moisture_a1",
+      "type": "moisture_ads1115",
+      "unit": "%",
+      "name": "Soil Moisture A1",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 1,
+        "adcDry": 23000,
+        "adcWet": 6400
+      }
+    },
+    {
+      "_comment": "Diagnostic twin of lab_moisture_a1, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
+      "type": "moisture_ads1115",
+      "id": "lab_moisture_a1_raw",
+      "unit": "V",
+      "name": "Soil Moisture A1 Raw Voltage",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 1
+      }
+    },
+    {
+      "_comment": "LAB PI ONLY: additional moisture probe on ADS1115 A2. Direct sampling on 2026-09-30 measured a stable 21370 raw (2.671 V). The 23000 dry and 6400 wet endpoints are provisional; replace them with this probe's measured dry and representative-wet endpoints before quantitative use.",
+      "id": "lab_moisture_a2",
+      "type": "moisture_ads1115",
+      "unit": "%",
+      "name": "Soil Moisture A2",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 2,
+        "adcDry": 23000,
+        "adcWet": 6400
+      }
+    },
+    {
+      "_comment": "Diagnostic twin of lab_moisture_a2, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
+      "type": "moisture_ads1115",
+      "id": "lab_moisture_a2_raw",
+      "unit": "V",
+      "name": "Soil Moisture A2 Raw Voltage",
+      "intervalSeconds": 60,
+      "samplesPerReading": 1,
+      "params": {
+        "channel": 2
+      }
+    },
+    {
+      "_comment": "ENABLED \u2014 the original CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This original lab unit free-runs, so do not add triggerPin to this entry. The new MB7389-100 is a separate sensor on UART2 in the following entry. Published with lab-specific ID lab_maxbotix_depth_1 so cloud data cannot mix with the field station.",
+      "type": "maxbotix",
+      "id": "lab_maxbotix_depth_1",
+      "unit": "in",
+      "name": "MB7389-100 Depth",
+      "intervalSeconds": 60,
+      "params": {
+        "device": "/dev/ttyAMA0",
+        "totalLength": 48
+      },
+      "samplesPerReading": 5
+    },
+    {
+      "_comment": "Diagnostic twin of lab_maxbotix_depth_1, publishing the raw measured distance (no totalLength, so no depth conversion applied).",
+      "type": "maxbotix",
+      "id": "lab_maxbotix_depth_1_raw",
+      "unit": "in",
+      "name": "MB7389-100 Raw Distance",
+      "intervalSeconds": 60,
+      "samplesPerReading": 5,
+      "params": {
+        "device": "/dev/ttyAMA0"
+      }
+    },
+    {
+      "_comment": "LAB PI NEW MB7389-100 (label B7604): powered from 3.3 V, sensor pin 5 TTL serial wired directly to GPIO5 / UART2 RX (physical pin 29), and pin 4 left open for continuous ranging. Requires dtoverlay=uart2-pi5 and /dev/ttyAMA2. This is separate from the installed inverted-polarity unit on /dev/ttyAMA0. Published with lab-specific ID lab_maxbotix_depth_2 so cloud data cannot mix with the field station.",
+      "type": "maxbotix",
+      "id": "lab_maxbotix_depth_2",
+      "unit": "in",
+      "name": "New MB7389-100 Depth",
+      "intervalSeconds": 60,
+      "params": {
+        "device": "/dev/ttyAMA2",
+        "totalLength": 48
+      },
+      "samplesPerReading": 5
+    },
+    {
+      "_comment": "Diagnostic twin of lab_maxbotix_depth_2, publishing the raw measured distance (no totalLength, so no depth conversion applied).",
+      "type": "maxbotix",
+      "id": "lab_maxbotix_depth_2_raw",
+      "unit": "in",
+      "name": "New MB7389-100 Raw Distance",
+      "intervalSeconds": 60,
+      "samplesPerReading": 5,
+      "params": {
+        "device": "/dev/ttyAMA2"
+      }
     }
   ],
   "weirFlow": {
@@ -107,86 +252,8 @@
     "outputUnit": "L/s"
   },
   "_inactiveFieldSensors": {
-    "reason": "Hardware moved to field station, confirmed by user 2026-11-17. Archived entries are not instantiated. Restore only when hardware is physically connected in lab.",
+    "reason": "Only pressure depth conversion remains inactive pending valid raw signal and calibration verification. Moisture and both MaxBotix restored 2026-11-20 at user request; previous blanket moved-to-field assumption was incorrect.",
     "sensors": [
-      {
-        "_comment": "LAB PI ONLY: soil-moisture probe analog output is wired to ADS1115 A0. Initial calibration from bench test on 2026-09-17: dry air ~17155 raw; wet endpoint ~6400 raw. MoistureSensorI2C maps dry to 0% and wet to 100% and clamps outside that range. Published with lab-specific ID lab_moisture_a0 so cloud data cannot mix with the field station.",
-        "id": "lab_moisture_a0",
-        "type": "moisture_ads1115",
-        "unit": "%",
-        "name": "Soil Moisture",
-        "intervalSeconds": 60,
-        "samplesPerReading": 1,
-        "params": {
-          "channel": 0,
-          "adcDry": 17155,
-          "adcWet": 6400
-        }
-      },
-      {
-        "_comment": "Diagnostic twin of lab_moisture_a0, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
-        "type": "moisture_ads1115",
-        "id": "lab_moisture_a0_raw",
-        "unit": "V",
-        "name": "Soil Moisture Raw Voltage",
-        "intervalSeconds": 60,
-        "samplesPerReading": 1,
-        "params": {
-          "channel": 0
-        }
-      },
-      {
-        "_comment": "LAB PI ONLY: additional moisture probe on ADS1115 A1. Direct sampling on 2026-09-30 measured a stable 21578 raw (2.697 V). The 23000 dry and 6400 wet endpoints are provisional; replace them with this probe's measured dry and representative-wet endpoints before quantitative use.",
-        "id": "lab_moisture_a1",
-        "type": "moisture_ads1115",
-        "unit": "%",
-        "name": "Soil Moisture A1",
-        "intervalSeconds": 60,
-        "samplesPerReading": 1,
-        "params": {
-          "channel": 1,
-          "adcDry": 23000,
-          "adcWet": 6400
-        }
-      },
-      {
-        "_comment": "Diagnostic twin of lab_moisture_a1, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
-        "type": "moisture_ads1115",
-        "id": "lab_moisture_a1_raw",
-        "unit": "V",
-        "name": "Soil Moisture A1 Raw Voltage",
-        "intervalSeconds": 60,
-        "samplesPerReading": 1,
-        "params": {
-          "channel": 1
-        }
-      },
-      {
-        "_comment": "LAB PI ONLY: additional moisture probe on ADS1115 A2. Direct sampling on 2026-09-30 measured a stable 21370 raw (2.671 V). The 23000 dry and 6400 wet endpoints are provisional; replace them with this probe's measured dry and representative-wet endpoints before quantitative use.",
-        "id": "lab_moisture_a2",
-        "type": "moisture_ads1115",
-        "unit": "%",
-        "name": "Soil Moisture A2",
-        "intervalSeconds": 60,
-        "samplesPerReading": 1,
-        "params": {
-          "channel": 2,
-          "adcDry": 23000,
-          "adcWet": 6400
-        }
-      },
-      {
-        "_comment": "Diagnostic twin of lab_moisture_a2, publishing raw channel voltage with no dry/wet calibration applied (no adcDry/adcWet). Lets drift or a bad calibration be checked directly in volts.",
-        "type": "moisture_ads1115",
-        "id": "lab_moisture_a2_raw",
-        "unit": "V",
-        "name": "Soil Moisture A2 Raw Voltage",
-        "intervalSeconds": 60,
-        "samplesPerReading": 1,
-        "params": {
-          "channel": 2
-        }
-      },
       {
         "_comment": "LAB PI ONLY: two-wire 4-20 mA water-level/pressure transmitter on ADS1115 A3. 'circuit' is the fixed measurement hardware (120-ohm shunt, 1-kohm series resistor protecting A3, NAMUR-style validMinMa/validMaxMa for open-loop/failure detection) -- shared by any probe wired here. 'calibration' is THIS probe's current-to-depth mapping and is expected to be replaced independently if the probe is swapped or recalibrated; calibration.points is the raw data behind the fitted currentMinMa/currentMaxMa/outputMin/outputMax. PROVISIONAL: only 2 points exist, both near the bottom of the sensor's range (0-2.7 in), for a transmitter whose other stations run 48-75 in standpipes. Treat as a working calibration for lab bring-up, not research-quality data -- collect >=5 points spanning 0 to the intended max depth and confirm linearity (residuals/R-squared) rather than assuming it, before this feeds anything like OpenHydroTwin data assimilation. CurrentLoopSensorI2C does not clamp to the calibrated span: an out-of-span reading is reported as an honest extrapolation with a warning logged, not silently pinned to the nearest endpoint. Raw loop current remains separately available as lab_pressure_loop_current_raw for diagnosing drift independent of this calibration.",
         "id": "lab_pressure_loop_current",
@@ -224,73 +291,6 @@
               }
             ]
           }
-        }
-      },
-      {
-        "_comment": "Diagnostic twin of lab_pressure_loop_current on the same ADS1115 A3 channel, publishing raw loop current with no scaling applied (no 'calibration' block). Lets drift, a bad calibration, or an out-of-span reading be checked directly in mA without reconstructing it from the depth value. Hidden from the default lab dashboard chart (see FrontEnd/config.lab.json) but always queryable from the API.",
-        "id": "lab_pressure_loop_current_raw",
-        "type": "current_loop_ads1115",
-        "unit": "mA",
-        "name": "Water-Level Transmitter Loop Current (raw)",
-        "intervalSeconds": 60,
-        "samplesPerReading": 3,
-        "params": {
-          "circuit": {
-            "channel": 3,
-            "shuntOhms": 120.0,
-            "validMinMa": 3.5,
-            "validMaxMa": 21.5
-          }
-        }
-      },
-      {
-        "_comment": "ENABLED \u2014 the original CUA lab MB7389-100 uses an active 2N3904 inverter with a 3.3-V pull-up between sensor pin 5 and GPIO15 (header pin 10). Raw /dev/ttyAMA0 capture verified valid R#### carriage-return frames after installation. This original lab unit free-runs, so do not add triggerPin to this entry. The new MB7389-100 is a separate sensor on UART2 in the following entry. Published with lab-specific ID lab_maxbotix_depth_1 so cloud data cannot mix with the field station.",
-        "type": "maxbotix",
-        "id": "lab_maxbotix_depth_1",
-        "unit": "in",
-        "name": "MB7389-100 Depth",
-        "intervalSeconds": 60,
-        "params": {
-          "device": "/dev/ttyAMA0",
-          "totalLength": 48
-        },
-        "samplesPerReading": 5
-      },
-      {
-        "_comment": "Diagnostic twin of lab_maxbotix_depth_1, publishing the raw measured distance (no totalLength, so no depth conversion applied).",
-        "type": "maxbotix",
-        "id": "lab_maxbotix_depth_1_raw",
-        "unit": "in",
-        "name": "MB7389-100 Raw Distance",
-        "intervalSeconds": 60,
-        "samplesPerReading": 5,
-        "params": {
-          "device": "/dev/ttyAMA0"
-        }
-      },
-      {
-        "_comment": "LAB PI NEW MB7389-100 (label B7604): powered from 3.3 V, sensor pin 5 TTL serial wired directly to GPIO5 / UART2 RX (physical pin 29), and pin 4 left open for continuous ranging. Requires dtoverlay=uart2-pi5 and /dev/ttyAMA2. This is separate from the installed inverted-polarity unit on /dev/ttyAMA0. Published with lab-specific ID lab_maxbotix_depth_2 so cloud data cannot mix with the field station.",
-        "type": "maxbotix",
-        "id": "lab_maxbotix_depth_2",
-        "unit": "in",
-        "name": "New MB7389-100 Depth",
-        "intervalSeconds": 60,
-        "params": {
-          "device": "/dev/ttyAMA2",
-          "totalLength": 48
-        },
-        "samplesPerReading": 5
-      },
-      {
-        "_comment": "Diagnostic twin of lab_maxbotix_depth_2, publishing the raw measured distance (no totalLength, so no depth conversion applied).",
-        "type": "maxbotix",
-        "id": "lab_maxbotix_depth_2_raw",
-        "unit": "in",
-        "name": "New MB7389-100 Raw Distance",
-        "intervalSeconds": 60,
-        "samplesPerReading": 5,
-        "params": {
-          "device": "/dev/ttyAMA2"
         }
       }
     ]
