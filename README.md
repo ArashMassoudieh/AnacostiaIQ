@@ -260,8 +260,12 @@ their effective dates with each modeling dataset.
 The lab and field are separate hardware installations with separate sensor IDs.
 The lab profile activates HC, BMP390 pressure/temperature, three ADS1115 moisture
 channels, both MaxBotix units, and raw pressure-loop current through SEN0262 on A3.
-Pressure depth conversion remains archived pending valid current and calibration
-verification. The previous blanket claim that lab hardware moved to the field was
+Pressure depth uses a provisional 2026-11-23 SEN0262 bench calibration:
+`depth_in = 3.5 * (current_mA - 4.00) / 1.30`. The approximate 3.5-inch
+endpoint includes the user's displacement correction; the 1.5-inch check
+corresponds to 4.56 mA. Raw current remains saved. Validate several measured
+depths across the intended field range before field use; this is not a field
+calibration. Historical data is not rewritten. The previous blanket claim that lab hardware moved to the field was
 incorrect; the lab sensors were restored on 2026-11-20. The independent field
 profile remains in `config.twin.json`.
 

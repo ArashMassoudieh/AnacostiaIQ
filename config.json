@@ -239,37 +239,54 @@
       "params": {
         "device": "/dev/ttyAMA2"
       }
-    }
-  ],
-  "weirFlow": {
-    "_comment": "Derived V-notch inflow flow. The lab_hcsr04_depth sensor reports head as params.totalLength (sensor-to-crest distance) minus measured range. Keep disabled until the field weir drawing supplies the surveyed sensor-to-crest distance and notch angle, Cd is selected/calibrated, and a defensible minimumHead is set. minimumHead uses the same unit as lab_hcsr04_depth. When enabled, values below minimumHead are withheld rather than reported as zero.",
-    "enabled": false,
-    "headSensorId": "lab_hcsr04_depth",
-    "flowSensorId": "inflow_flow_rate",
-    "dischargeCoefficient": null,
-    "notchAngleDegrees": null,
-    "minimumHead": null,
-    "outputUnit": "L/s"
-  },
-  "_inactiveFieldSensors": {
-    "reason": "Only pressure depth conversion remains inactive pending valid raw signal and calibration verification. Moisture and both MaxBotix restored 2026-11-20 at user request; previous blanket moved-to-field assumption was incorrect.",
-    "sensors": [
-      {
-        "_comment": "LAB PI ONLY: two-wire 4-20 mA water-level/pressure transmitter on ADS1115 A3. 'circuit' is the fixed measurement hardware (120-ohm shunt, 1-kohm series resistor protecting A3, NAMUR-style validMinMa/validMaxMa for open-loop/failure detection) -- shared by any probe wired here. 'calibration' is THIS probe's current-to-depth mapping and is expected to be replaced independently if the probe is swapped or recalibrated; calibration.points is the raw data behind the fitted currentMinMa/currentMaxMa/outputMin/outputMax. PROVISIONAL: only 2 points exist, both near the bottom of the sensor's range (0-2.7 in), for a transmitter whose other stations run 48-75 in standpipes. Treat as a working calibration for lab bring-up, not research-quality data -- collect >=5 points spanning 0 to the intended max depth and confirm linearity (residuals/R-squared) rather than assuming it, before this feeds anything like OpenHydroTwin data assimilation. CurrentLoopSensorI2C does not clamp to the calibrated span: an out-of-span reading is reported as an honest extrapolation with a warning logged, not silently pinned to the nearest endpoint. Raw loop current remains separately available as lab_pressure_loop_current_raw for diagnosing drift independent of this calibration.",
-        "id": "lab_pressure_loop_current",
-        "type": "current_loop_ads1115",
-        "unit": "in",
-        "name": "Water-Level Transmitter Depth",
-        "intervalSeconds": 60,
-        "samplesPerReading": 3,
-        "params": {
-          "circuit": {
-            "channel": 3,
-            "shuntOhms": 120.0,
-            "validMinMa": 3.5,
-            "validMaxMa": 21.5
-          },
-          "calibration": {
+    },
+    {
+      "_comment": "LAB ONLY provisional SEN0262 calibration adopted 2026-11-23: zero 4.00 mA; approximately 3.5 inches at 5.30 mA, depth revised by user for water displacement. Intermediate approximately 1.5 inches at 4.56 mA is a consistency check, not a fit endpoint. Not validated across field range. No external shunt or series resistor; shuntOhms is the SEN0262 120-ohm equivalent transfer. Raw current remains enabled. Out-of-span depths extrapolate with warnings.",
+      "id": "lab_pressure_loop_current",
+      "type": "current_loop_ads1115",
+      "unit": "in",
+      "name": "Water-Level Transmitter Depth",
+      "intervalSeconds": 60,
+      "samplesPerReading": 3,
+      "params": {
+        "circuit": {
+          "channel": 3,
+          "shuntOhms": 120.0,
+          "validMinMa": 3.5,
+          "validMaxMa": 21.5
+        },
+        "calibration": {
+          "currentMinMa": 4.0,
+          "currentMaxMa": 5.3,
+          "outputMin": 0.0,
+          "outputMax": 3.5,
+          "status": "provisional_approximate_bench_depths",
+          "effective_date": "2026-11-23",
+          "points": [
+            {
+              "date": "2026-11-23",
+              "reference_depth_in": 0,
+              "current_ma": 4.0,
+              "voltage_v": 0.48,
+              "notes": "Out-of-water zero check."
+            },
+            {
+              "date": "2026-11-23",
+              "reference_depth_in": 3.5,
+              "current_ma": 5.3,
+              "voltage_v": 0.63625,
+              "notes": "Approximate depth revised by user from 3 to 3.5 inches to account for displacement; measured median 5.30208 mA rounded to adopted endpoint."
+            }
+          ],
+          "check_points": [
+            {
+              "date": "2026-11-23",
+              "reference_depth_in": 1.5,
+              "current_ma": 4.56,
+              "notes": "Approximate independent intermediate depth; predicted 1.508 inches."
+            }
+          ],
+          "previous_calibration": {
             "currentMinMa": 3.9,
             "currentMaxMa": 4.852,
             "outputMin": 0.0,
@@ -293,6 +310,20 @@
           }
         }
       }
-    ]
+    }
+  ],
+  "weirFlow": {
+    "_comment": "Derived V-notch inflow flow. The lab_hcsr04_depth sensor reports head as params.totalLength (sensor-to-crest distance) minus measured range. Keep disabled until the field weir drawing supplies the surveyed sensor-to-crest distance and notch angle, Cd is selected/calibrated, and a defensible minimumHead is set. minimumHead uses the same unit as lab_hcsr04_depth. When enabled, values below minimumHead are withheld rather than reported as zero.",
+    "enabled": false,
+    "headSensorId": "lab_hcsr04_depth",
+    "flowSensorId": "inflow_flow_rate",
+    "dischargeCoefficient": null,
+    "notchAngleDegrees": null,
+    "minimumHead": null,
+    "outputUnit": "L/s"
+  },
+  "_inactiveFieldSensors": {
+    "reason": "No sensors archived here. Lab hardware is separate from field. Pressure depth restored with provisional bench calibration 2026-11-23.",
+    "sensors": []
   }
 }
