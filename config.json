@@ -241,7 +241,7 @@
       }
     },
     {
-      "_comment": "LAB ONLY provisional SEN0262 calibration adopted 2026-11-23: zero 4.00 mA; approximately 3.5 inches at 5.30 mA, depth revised by user for water displacement. Intermediate approximately 1.5 inches at 4.56 mA is a consistency check, not a fit endpoint. Not validated across field range. No external shunt or series resistor; shuntOhms is the SEN0262 120-ohm equivalent transfer. Raw current remains enabled. Out-of-span depths extrapolate with warnings.",
+      "_comment": "LAB ONLY provisional SEN0262 calibration: zero 4.00 mA; 3.1 inches at adopted 5.30 mA endpoint. User corrected previous depth estimate on 2026-11-24; removed unreliable 1.5-inch check point. Not validated across field range. SEN0262 uses 120-ohm equivalent transfer; no external resistors. Raw current remains enabled; out-of-span depths extrapolate with warnings.",
       "id": "lab_pressure_loop_current",
       "type": "current_loop_ads1115",
       "unit": "in",
@@ -259,7 +259,7 @@
           "currentMinMa": 4.0,
           "currentMaxMa": 5.3,
           "outputMin": 0.0,
-          "outputMax": 3.5,
+          "outputMax": 3.1,
           "status": "provisional_approximate_bench_depths",
           "effective_date": "2026-11-23",
           "points": [
@@ -272,18 +272,10 @@
             },
             {
               "date": "2026-11-23",
-              "reference_depth_in": 3.5,
+              "reference_depth_in": 3.1,
               "current_ma": 5.3,
               "voltage_v": 0.63625,
-              "notes": "Approximate depth revised by user from 3 to 3.5 inches to account for displacement; measured median 5.30208 mA rounded to adopted endpoint."
-            }
-          ],
-          "check_points": [
-            {
-              "date": "2026-11-23",
-              "reference_depth_in": 1.5,
-              "current_ma": 4.56,
-              "notes": "Approximate independent intermediate depth; predicted 1.508 inches."
+              "notes": "Depth corrected by user to 3.1 inches with transmitter inserted (2026-11-24). Original adopted 5.30 mA endpoint retained; no refit to subsequent samples."
             }
           ],
           "previous_calibration": {
@@ -307,7 +299,8 @@
                 "notes": "Submerged in a bench glass; depth read by eye against the glass, not precision-measured."
               }
             ]
-          }
+          },
+          "reference_corrected_date": "2026-11-24"
         }
       }
     }
